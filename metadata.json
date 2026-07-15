@@ -1,0 +1,6 @@
+{
+  "name": "AssetManager IT",
+  "description": "ระบบบริหารจัดการครุภัณฑ์คอมพิวเตอร์และระบบบริหารการซ่อมบำรุงสำหรับองค์กร",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
