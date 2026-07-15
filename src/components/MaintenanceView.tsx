@@ -19,7 +19,10 @@ import {
   CheckSquare,
   Calendar,
   Search,
-  Trash2
+  Trash2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface MaintenanceViewProps {
@@ -48,6 +51,11 @@ export default function MaintenanceView({
   // Modal State
   const [isRepairModalOpen, setIsRepairModalOpen] = useState(false);
   const [ticketActionMenuId, setTicketActionMenuId] = useState<string | null>(null);
+  const [ticketToCancel, setTicketToCancel] = useState<{ id: string; assetName: string } | null>(null);
+
+  // Pagination State for Repair Tickets Table
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Maintenance Events Modal & Create states
   const [isEventsModalOpen, setIsEventsModalOpen] = useState(false);
@@ -157,9 +165,39 @@ export default function MaintenanceView({
   };
 
   // Compute stats with base offsets
-  const pendingCount = 12 + repairTickets.filter((t) => t.status === 'Pending').length;
-  const repairingCount = 8 + repairTickets.filter((t) => t.status === 'Repairing').length;
-  const completedCount = 45 + repairTickets.filter((t) => t.status === 'Completed').length;
+  const pendingCount = 0 + repairTickets.filter((t) => t.status === 'Pending').length;
+  const repairingCount = 0 + repairTickets.filter((t) => t.status === 'Repairing').length;
+  const completedCount = 0 + repairTickets.filter((t) => t.status === 'Completed').length;
+
+  // Pagination logic for Repair Tickets
+  const totalPages = Math.ceil(repairTickets.length / itemsPerPage) || 1;
+
+  React.useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [repairTickets.length, totalPages, currentPage]);
+
+  const paginatedTickets = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return repairTickets.slice(startIndex, startIndex + itemsPerPage);
+  }, [repairTickets, currentPage, itemsPerPage]);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
 
   const getPriorityBadge = (priority: 'Low' | 'Medium' | 'Critical') => {
     switch (priority) {
@@ -261,12 +299,41 @@ export default function MaintenanceView({
 
           {/* Repair Tickets Table */}
           <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+            <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
               <h3 className="font-bold text-slate-800 font-sans">รายการแจ้งซ่อมปัจจุบัน</h3>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-xl text-xs text-slate-500 hover:bg-slate-500 transition-colors select-none cursor-pointer">
-                <Filter className="w-3.5 h-3.5" />
-                <span>กรองข้อมูล</span>
-              </button>
+              
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                  <span>แสดง:</span>
+                  <div className="relative">
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="appearance-none pl-3 pr-7 py-1 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs rounded-xl focus:outline-none transition-all cursor-pointer shadow-sm"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                  <span>รายการต่อหน้า</span>
+                </div>
+
+                <div className="text-xs text-slate-400 font-medium">
+                  แสดง <span className="text-slate-800 font-semibold">{repairTickets.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, repairTickets.length)}</span> จาก{' '}
+                  <span className="text-slate-800 font-semibold">{repairTickets.length}</span> รายการ
+                </div>
+                
+                <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-xl text-xs text-slate-500 hover:bg-slate-50 transition-colors bg-white select-none cursor-pointer">
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>กรองข้อมูล</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -282,7 +349,7 @@ export default function MaintenanceView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {repairTickets.map((ticket) => {
+                  {paginatedTickets.map((ticket) => {
                     const isPending = ticket.status === 'Pending';
                     const isRepairing = ticket.status === 'Repairing';
                     const isCompleted = ticket.status === 'Completed';
@@ -375,10 +442,8 @@ export default function MaintenanceView({
                                 {/* Cancel/Delete Ticket Action */}
                                 <button
                                   onClick={() => {
-                                    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบใบสั่งซ่อม ${ticket.id}?`)) {
-                                      onDeleteRepairTicket(ticket.id);
-                                      setTicketActionMenuId(null);
-                                    }
+                                    setTicketToCancel({ id: ticket.id, assetName: ticket.assetName });
+                                    setTicketActionMenuId(null);
                                   }}
                                   className="w-full text-left px-4 py-2 hover:bg-rose-50 text-xs font-semibold text-rose-600 flex items-center gap-2 cursor-pointer border-t border-slate-100"
                                 >
@@ -402,30 +467,49 @@ export default function MaintenanceView({
                 </tbody>
               </table>
             </div>
+
+            {/* Table Footer Navigation */}
+            <div className="p-5 bg-slate-50/70 border-t border-slate-100 flex justify-between items-center">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl font-bold text-[11px] text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>ก่อนหน้า</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {getPageNumbers().map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`w-7 h-7 rounded-lg font-bold text-[11px] font-sans transition-all cursor-pointer ${
+                      currentPage === p
+                        ? 'bg-primary text-white'
+                        : 'hover:bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl font-bold text-[11px] text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <span>ถัดไป</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right Side: Live Monitor & Preventive Maintenance */}
+        {/* Right Side: Preventive Maintenance */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
           
-          {/* Live Monitor Card */}
-          <div className="relative rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm aspect-video sm:aspect-auto sm:h-48 flex flex-col justify-end p-5 select-none shrink-0">
-            <div className="absolute inset-0 bg-slate-900/45 z-10 pointer-events-none"></div>
-            <img
-              className="absolute inset-0 w-full h-full object-cover z-0"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiokzNxXgQMuRl6EkwNPeIz5Tmkm60rJBG3tuskUHskdH37eFOohG4aBX55S7u_iwBq8qqzQPy0Dp6ACpN3kC2k3nEf4jTYNHJmz44vi9DO9WzTkseVymEsZiJ-1LAj2QLl2mApt3AUBCmV5KoZyCRmd0NxYcXL2bcVR6jowhr7ajknwzxtcjq7qMmjoQbHbmPrScfzsGdsQouTGztY1rW9OIWfIk30TLYZF_jVbehvuk8W6vuIeJJBjI8JPX3IeYCt-KcHjDtAQ"
-              alt="Live Monitor server room"
-              referrerPolicy="no-referrer"
-            />
-            <div className="relative z-20 text-white space-y-1">
-              <span className="inline-block bg-teal-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-lg mb-1 tracking-wider uppercase">
-                LIVE MONITOR
-              </span>
-              <h4 className="text-base font-bold font-sans">Server Health: Normal</h4>
-              <p className="text-xs text-slate-200 font-sans">การเชื่อมต่อและอุณหภูมิอยู่ในเกณฑ์ปกติ</p>
-            </div>
-          </div>
-
           {/* Preventive Maintenance Calendar Schedule */}
           <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col justify-between overflow-hidden flex-1">
             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
@@ -940,6 +1024,51 @@ export default function MaintenanceView({
                 className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
               >
                 ยืนยันการลบ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Cancel Repair Ticket Confirmation */}
+      {ticketToCancel && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-5 border-b border-slate-100 bg-rose-50/50 flex items-center gap-2.5">
+              <Trash2 className="w-5 h-5 text-rose-600 animate-bounce" />
+              <h3 className="font-bold text-slate-800 text-sm font-sans">ยืนยันการยกเลิกใบสั่งซ่อม</h3>
+            </div>
+            
+            <div className="p-6 space-y-3">
+              <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบใบสั่งซ่อมนี้:
+              </p>
+              <div className="p-3 bg-rose-50/30 border border-rose-100 rounded-xl">
+                <p className="text-xs font-bold text-slate-800 leading-snug">{ticketToCancel.assetName}</p>
+                <p className="text-[10px] text-slate-400 font-mono mt-1">เลขอ้างอิงใบงาน: {ticketToCancel.id}</p>
+              </div>
+              <p className="text-[11px] text-rose-500 font-medium">
+                * ใบสั่งซ่อมจะถูกยกเลิกและนำออกจากระบบบริหารการซ่อมบำรุง
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setTicketToCancel(null)}
+                className="px-4 py-2 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                ย้อนกลับ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteRepairTicket(ticketToCancel.id);
+                  setTicketToCancel(null);
+                }}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                ยืนยันการยกเลิก
               </button>
             </div>
           </div>

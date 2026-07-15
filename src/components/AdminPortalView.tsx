@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
   Users, 
@@ -13,22 +13,15 @@ import {
   Download, 
   Trash2, 
   UserPlus, 
-  AlertTriangle 
+  AlertTriangle,
+  Edit
 } from 'lucide-react';
-import { Asset } from '../types';
+import { Asset, UserRecord } from '../types';
+import { getUsers, saveUser, deleteUser } from '../lib/firebase';
 
 interface AdminPortalViewProps {
   assets: Asset[];
   triggerToast: (type: 'success' | 'error' | 'info', message: string) => void;
-}
-
-interface UserRecord {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user';
-  department: string;
-  status: 'Active' | 'Suspended';
 }
 
 interface SystemLog {
@@ -41,13 +34,41 @@ interface SystemLog {
 }
 
 export default function AdminPortalView({ assets, triggerToast }: AdminPortalViewProps) {
-  // Mock users
-  const [users, setUsers] = useState<UserRecord[]>([
-    { id: 'U-01', name: 'คุณสิรินทร์ เทคโน', email: 'admin@assetmanager.com', role: 'admin', department: 'IT Department', status: 'Active' },
-    { id: 'U-02', name: 'คุณสมชาย พนักงานไอที', email: 'user@assetmanager.com', role: 'user', department: 'IT Operations', status: 'Active' },
-    { id: 'U-03', name: 'คุณวิภา วงศ์ดี', email: 'wipa.w@assetmanager.com', role: 'user', department: 'Accounting', status: 'Active' },
-    { id: 'U-04', name: 'คุณนพดล เกียรติภูมิ', email: 'noppadol.k@assetmanager.com', role: 'user', department: 'IT Infrastructure', status: 'Active' },
-  ]);
+  // Persistent users state loader
+  const [users, setUsers] = useState<UserRecord[]>(() => {
+    const saved = localStorage.getItem('assetmanager_users');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    return [
+      { id: 'U-01', name: 'คุณสิรินทร์ เทคโน', email: 'admin@assetmanager.com', role: 'admin', department: 'IT Department', status: 'Active' },
+      { id: 'U-02', name: 'คุณสมชาย พนักงานไอที', email: 'user@assetmanager.com', role: 'user', department: 'IT Operations', status: 'Active' },
+      { id: 'U-03', name: 'คุณวิภา วงศ์ดี', email: 'wipa.w@assetmanager.com', role: 'user', department: 'Accounting', status: 'Active' },
+      { id: 'U-04', name: 'คุณนพดล เกียรติภูมิ', email: 'noppadol.k@assetmanager.com', role: 'user', department: 'IT Infrastructure', status: 'Active' },
+    ];
+  });
+
+  // Load users from Firebase on mount
+  useEffect(() => {
+    async function loadUsers() {
+      try {
+        const fbUsers = await getUsers();
+        setUsers(fbUsers);
+      } catch (e) {
+        console.error("Failed to load users from Firebase:", e);
+      }
+    }
+    loadUsers();
+  }, []);
+
+  // Save users to localStorage
+  useEffect(() => {
+    localStorage.setItem('assetmanager_users', JSON.stringify(users));
+  }, [users]);
 
   // Mock logs
   const [logs, setLogs] = useState<SystemLog[]>([
@@ -69,6 +90,10 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
   const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
   const [newUserDept, setNewUserDept] = useState('');
 
+  // Edit / Delete User State
+  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  const [userToDelete, setUserToDelete] = useState<UserRecord | null>(null);
+
   // DB Optimization loading simulation
   const [isOptimizing, setIsOptimizing] = useState(false);
 
@@ -79,8 +104,13 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
       return;
     }
 
+    const nextIdNum = users.length > 0 ? Math.max(...users.map(u => {
+      const match = u.id.match(/\d+/);
+      return match ? parseInt(match[0], 10) : 0;
+    })) + 1 : 1;
+
     const newUser: UserRecord = {
-      id: `U-0${users.length + 1}`,
+      id: `U-${String(nextIdNum).padStart(2, '0')}`,
       name: newUserName,
       email: newUserEmail,
       role: newUserRole,
@@ -89,6 +119,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
     };
 
     setUsers([newUser, ...users]);
+    saveUser(newUser);
     
     // Log this action
     const newLog: SystemLog = {
@@ -108,6 +139,50 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
     triggerToast('success', `เพิ่มบัญชีผู้ใช้ใหม่ ${newUserName} สำเร็จ`);
   };
 
+  const handleUpdateUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setUsers(prev => prev.map(u => u.id === editingUser.id ? editingUser : u));
+    saveUser(editingUser);
+
+    // Log this action
+    const newLog: SystemLog = {
+      id: `LOG-${Date.now().toString().slice(-3)}`,
+      timestamp: new Date().toLocaleString('th-TH'),
+      user: 'คุณสิรินทร์ เทคโน (Admin)',
+      action: `แก้ไขข้อมูลและสิทธิ์ผู้ใช้: ${editingUser.name} (สิทธิ์: ${editingUser.role}, สถานะ: ${editingUser.status})`,
+      ip: '192.168.1.14',
+      status: 'SUCCESS',
+    };
+    setLogs([newLog, ...logs]);
+
+    setEditingUser(null);
+    triggerToast('success', `อัปเดตข้อมูลและสิทธิ์ของ ${editingUser.name} สำเร็จ`);
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return;
+
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    deleteUser(userId);
+
+    // Log this action
+    const newLog: SystemLog = {
+      id: `LOG-${Date.now().toString().slice(-3)}`,
+      timestamp: new Date().toLocaleString('th-TH'),
+      user: 'คุณสิรินทร์ เทคโน (Admin)',
+      action: `ลบผู้ใช้งานระบบ: ${targetUser.name} (${targetUser.email})`,
+      ip: '192.168.1.14',
+      status: 'SUCCESS',
+    };
+    setLogs([newLog, ...logs]);
+
+    setUserToDelete(null);
+    triggerToast('success', `ลบผู้ใช้งาน ${targetUser.name} เรียบร้อยแล้ว`);
+  };
+
   const handleToggleUserStatus = (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
@@ -115,12 +190,14 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
     const nextStatus = targetUser.status === 'Active' ? 'Suspended' : 'Active';
     triggerToast('info', `เปลี่ยนสถานะผู้ใช้งาน ${targetUser.name} เป็น ${nextStatus}`);
 
+    const updatedUser = { ...targetUser, status: nextStatus };
     setUsers(prev => prev.map(u => {
       if (u.id === userId) {
-        return { ...u, status: nextStatus };
+        return updatedUser;
       }
       return u;
     }));
+    saveUser(updatedUser);
   };
 
   const handleOptimizeDB = () => {
@@ -169,8 +246,8 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
     <div className="space-y-6 font-sans">
       
       {/* Title Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#00236f] text-white p-6 sm:p-8 rounded-2xl shadow-md">
-        <div className="space-y-1">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-[#00236f] text-white p-6 sm:p-8 rounded-2xl shadow-md">
+        <div className="space-y-1 flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="p-1.5 bg-white/10 rounded-lg">
               <ShieldAlert className="w-5 h-5 text-sky-400" />
@@ -184,7 +261,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
             สำหรับผู้ดูแลระบบสูงสุดในการจำลองระบบสิทธิ์พนักงาน ตรวจสอบประวัติการเข้าใช้งานความปลอดภัย (Security Audit Logs) และปรับปรุงประสิทธิภาพฐานข้อมูล
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap sm:flex-nowrap">
           <button
             onClick={handleOptimizeDB}
             disabled={isOptimizing}
@@ -270,16 +347,35 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
                     </td>
                     <td className="py-3 px-2 text-slate-500 font-semibold text-[11px]">{user.department}</td>
                     <td className="py-3 px-5 text-right">
-                      <button
-                        onClick={() => handleToggleUserStatus(user.id)}
-                        className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all cursor-pointer ${
-                          user.status === 'Active'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                            : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
-                        }`}
-                      >
-                        {user.status === 'Active' ? 'Active' : 'Suspended'}
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleToggleUserStatus(user.id)}
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border transition-all cursor-pointer ${
+                            user.status === 'Active'
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                              : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
+                          }`}
+                          title={user.status === 'Active' ? 'ระงับบัญชี' : 'เปิดใช้งานบัญชี'}
+                        >
+                          {user.status === 'Active' ? 'Active' : 'Suspended'}
+                        </button>
+                        
+                        <button
+                          onClick={() => setEditingUser(user)}
+                          title="ตั้งค่าสิทธิ์ / แก้ไขข้อมูล"
+                          className="p-1 hover:bg-slate-100 text-[#00236f] hover:text-primary rounded transition-colors cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        
+                        <button
+                          onClick={() => setUserToDelete(user)}
+                          title="ลบผู้ใช้งาน"
+                          className="p-1 hover:bg-rose-50 text-rose-500 hover:text-rose-700 rounded transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -433,6 +529,156 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Edit User / ตั้งค่าสิทธิ์ Modal Dialog */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4">
+          <form 
+            onSubmit={handleUpdateUserSubmit}
+            className="bg-white w-full max-w-md rounded-2xl border border-slate-100 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+          >
+            <div className="p-4 bg-[#00236f] text-white flex justify-between items-center">
+              <h4 className="font-bold text-sm">ตั้งค่าสิทธิ์และแก้ไขข้อมูลผู้ใช้งาน</h4>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* ID Info */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                <span className="text-[10px] font-mono text-slate-400 font-bold bg-slate-200 px-1.5 py-0.5 rounded">รหัสบัญชี: {editingUser.id}</span>
+                <p className="text-xs font-bold text-slate-800 mt-1.5">ผู้ใช้: {editingUser.name}</p>
+              </div>
+
+              {/* Name Edit */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">ชื่อ-นามสกุล พนักงาน</label>
+                <input
+                  type="text"
+                  required
+                  value={editingUser.name}
+                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {/* Email Edit */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">อีเมลล็อกอิน</label>
+                <input
+                  type="email"
+                  required
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {/* Department Edit */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">แผนกสังกัด</label>
+                <input
+                  type="text"
+                  required
+                  value={editingUser.department}
+                  onChange={(e) => setEditingUser({ ...editingUser, department: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {/* Role Select Edit */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">บทบาทสิทธิ์ (Role Permission)</label>
+                <select
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as 'admin' | 'user' })}
+                  className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none"
+                >
+                  <option value="user">IT Operations (จำกัดการควบคุมคุณสมบัติหลัก)</option>
+                  <option value="admin">Administrator (ควบคุมทุกข้อมูลระบบและประวัติ)</option>
+                </select>
+              </div>
+
+              {/* Status Select Edit */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">สถานะบัญชี (Account Status)</label>
+                <select
+                  value={editingUser.status}
+                  onChange={(e) => setEditingUser({ ...editingUser, status: e.target.value as 'Active' | 'Suspended' })}
+                  className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none"
+                >
+                  <option value="Active">Active (เปิดใช้งานปกติ)</option>
+                  <option value="Suspended">Suspended (ระงับบัญชีการเข้าสู่ระบบ)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="px-4 py-2 text-slate-500 hover:text-slate-800 font-bold cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-[#00236f] hover:bg-primary text-white font-bold rounded-xl cursor-pointer"
+              >
+                บันทึกการแก้ไข
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: Delete User Confirmation */}
+      {userToDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-5 border-b border-slate-100 bg-rose-50/50 flex items-center gap-2.5">
+              <Trash2 className="w-5 h-5 text-rose-600 animate-bounce" />
+              <h3 className="font-bold text-slate-800 text-sm font-sans">ยืนยันการลบผู้ใช้งาน</h3>
+            </div>
+            
+            <div className="p-6 space-y-3">
+              <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งานรายนี้ออกจากระบบ?
+              </p>
+              <div className="p-3 bg-rose-50/30 border border-rose-100 rounded-xl">
+                <p className="text-xs font-bold text-slate-800 leading-snug">{userToDelete.name}</p>
+                <p className="text-[10px] text-slate-400 font-mono mt-1">อีเมล: {userToDelete.email}</p>
+                <p className="text-[10px] text-slate-400 font-mono">แผนกสังกัด: {userToDelete.department}</p>
+              </div>
+              <p className="text-[11px] text-rose-500 font-medium">
+                * บัญชีผู้ใช้นี้จะถูกนำออกจากระบบถาวร ไม่สามารถกู้คืนได้
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="px-4 py-2 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteUser(userToDelete.id)}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                ยืนยันการลบผู้ใช้
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

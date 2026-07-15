@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Asset, RepairTicket } from '../types';
 import { jsPDF } from 'jspdf';
 import {
@@ -31,10 +31,38 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
   // Navigation tabs: 'assets' or 'maintenance'
   const [activeReportTab, setActiveReportTab] = useState<'assets' | 'maintenance'>('maintenance');
 
+  // Find the most recent ticket to determine the default year and month
+  const defaultYearMonth = useMemo(() => {
+    if (repairTickets.length > 0) {
+      const sorted = [...repairTickets].sort((a, b) => (b.dateSubmitted || '').localeCompare(a.dateSubmitted || ''));
+      const latestDate = sorted[0]?.dateSubmitted || '';
+      if (latestDate && latestDate.includes('-')) {
+        const parts = latestDate.split('-');
+        return {
+          year: parts[0],
+          month: parts[1]
+        };
+      }
+    }
+    return { year: '2024', month: '05' };
+  }, [repairTickets]);
+
   // Month-Year Selection State for Maintenance Report
-  // Default to 2024-05 since it is the month with seed/mock data, but allow selection of others.
-  const [selectedYear, setSelectedYear] = useState<string>('2024');
-  const [selectedMonth, setSelectedMonth] = useState<string>('05');
+  const [selectedYear, setSelectedYear] = useState<string>(defaultYearMonth.year);
+  const [selectedMonth, setSelectedMonth] = useState<string>(defaultYearMonth.month);
+
+  // Automatically select the year and month of the most recently added/updated ticket
+  useEffect(() => {
+    if (repairTickets.length > 0) {
+      const sorted = [...repairTickets].sort((a, b) => (b.dateSubmitted || '').localeCompare(a.dateSubmitted || ''));
+      const latestDate = sorted[0]?.dateSubmitted || '';
+      if (latestDate && latestDate.includes('-')) {
+        const [yr, mo] = latestDate.split('-');
+        setSelectedYear(yr);
+        setSelectedMonth(mo);
+      }
+    }
+  }, [repairTickets]);
 
   // Available months/years list calculated dynamically from existing tickets
   const yearOptions = useMemo(() => {
@@ -70,9 +98,9 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
   // Asset Cost Breakdown Calculations
   const totalInvestment = assets.reduce((sum, asset) => sum + asset.purchasePrice, 0);
   const averagePrice = assets.length > 0 ? Math.round(totalInvestment / assets.length) : 0;
-  const activePercent = Math.round(
+  const activePercent = assets.length > 0 ? Math.round(
     (assets.filter((a) => a.status === 'In Use' || a.status === 'Available').length / assets.length) * 100
-  );
+  ) : 0;
 
   const categorySummary = assets.reduce((acc, asset) => {
     acc[asset.category] = (acc[asset.category] || 0) + asset.purchasePrice;
@@ -782,7 +810,7 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">อัตราสัดส่วนพร้อมใช้</p>
                 <h4 className="text-xl font-bold text-slate-800 mt-0.5">
-                  {Math.round((assets.filter(a => a.status === 'Available').length / assets.length) * 100)}%
+                  {assets.length > 0 ? Math.round((assets.filter(a => a.status === 'Available').length / assets.length) * 100) : 0}%
                 </h4>
                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">พร้อมจัดส่งให้พนักงานใหม่</p>
               </div>

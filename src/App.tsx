@@ -14,22 +14,33 @@ import AdminPortalView from './components/AdminPortalView';
 
 import { SEED_ASSETS, SEED_REPAIR_TICKETS, SEED_MAINTENANCE_EVENTS } from './mockData';
 import { Asset, RepairTicket, MaintenanceEvent, UserSession } from './types';
+import { 
+  getAssets, 
+  saveAsset, 
+  deleteAsset, 
+  getRepairTickets, 
+  saveRepairTicket, 
+  deleteRepairTicket, 
+  getMaintenanceEvents, 
+  saveMaintenanceEvent, 
+  deleteMaintenanceEvent 
+} from './lib/firebase';
 
 export default function App() {
   // Master persistent state loaders
   const [assets, setAssets] = useState<Asset[]>(() => {
     const saved = localStorage.getItem('assetmanager_assets');
-    return saved ? JSON.parse(saved) : SEED_ASSETS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [repairTickets, setRepairTickets] = useState<RepairTicket[]>(() => {
     const saved = localStorage.getItem('assetmanager_tickets');
-    return saved ? JSON.parse(saved) : SEED_REPAIR_TICKETS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [maintenanceEvents, setMaintenanceEvents] = useState<MaintenanceEvent[]>(() => {
     const saved = localStorage.getItem('assetmanager_events');
-    return saved ? JSON.parse(saved) : SEED_MAINTENANCE_EVENTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   // User auth session
@@ -37,6 +48,29 @@ export default function App() {
     const saved = localStorage.getItem('assetmanager_user');
     return saved ? JSON.parse(saved) : null;
   });
+
+  const [isLoadingFirebase, setIsLoadingFirebase] = useState(true);
+
+  // Load from Firebase on Mount
+  useEffect(() => {
+    async function loadFirebaseData() {
+      try {
+        const [fbAssets, fbTickets, fbEvents] = await Promise.all([
+          getAssets(),
+          getRepairTickets(),
+          getMaintenanceEvents()
+        ]);
+        setAssets(fbAssets);
+        setRepairTickets(fbTickets);
+        setMaintenanceEvents(fbEvents);
+      } catch (e) {
+        console.error("Failed to load data from Firebase:", e);
+      } finally {
+        setIsLoadingFirebase(false);
+      }
+    }
+    loadFirebaseData();
+  }, []);
 
   // Mobile sidebar open state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -98,11 +132,13 @@ export default function App() {
   // Add Asset Core Action
   const handleAddAsset = (newAsset: Asset) => {
     setAssets((prev) => [newAsset, ...prev]);
+    saveAsset(newAsset);
   };
 
   // Edit Asset Core Action
   const handleEditAsset = (updatedAsset: Asset) => {
     setAssets((prev) => prev.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset)));
+    saveAsset(updatedAsset);
     // Sync current active view details state in case we edited it inside Details view
     if (selectedAssetId === updatedAsset.id) {
       // Re-trigger reference
@@ -114,6 +150,7 @@ export default function App() {
   // Delete Asset Core Action
   const handleDeleteAsset = (id: string) => {
     setAssets((prev) => prev.filter((asset) => asset.id !== id));
+    deleteAsset(id);
     if (selectedAssetId === id) {
       setSelectedAssetId(null);
       setActiveTab('inventory');
@@ -123,31 +160,40 @@ export default function App() {
   // Add Repair Request Core Action
   const handleAddRepairTicket = (newTicket: RepairTicket) => {
     setRepairTickets((prev) => [newTicket, ...prev]);
+    saveRepairTicket(newTicket);
     triggerToast('success', `เปิดใบสั่งซ่อม ${newTicket.id} เรียบร้อยแล้ว`);
   };
 
   // Update Status of repair ticket
   const handleUpdateTicketStatus = (id: string, newStatus: 'Pending' | 'Repairing' | 'Completed') => {
-    setRepairTickets((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t))
-    );
+    setRepairTickets((prev) => {
+      const updated = prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t));
+      const target = updated.find(t => t.id === id);
+      if (target) {
+        saveRepairTicket(target);
+      }
+      return updated;
+    });
   };
 
   // Delete Repair Ticket Core Action
   const handleDeleteRepairTicket = (id: string) => {
     setRepairTickets((prev) => prev.filter((t) => t.id !== id));
+    deleteRepairTicket(id);
     triggerToast('success', `ยกเลิกใบสั่งซ่อม ${id} สำเร็จแล้ว`);
   };
 
   // Add Maintenance Event Core Action
   const handleAddMaintenanceEvent = (newEvent: MaintenanceEvent) => {
     setMaintenanceEvents((prev) => [newEvent, ...prev]);
+    saveMaintenanceEvent(newEvent);
     triggerToast('success', `เพิ่มแผนงานบำรุงรักษา "${newEvent.title}" เรียบร้อยแล้ว`);
   };
 
   // Delete Maintenance Event Core Action
   const handleDeleteMaintenanceEvent = (id: string) => {
     setMaintenanceEvents((prev) => prev.filter((event) => event.id !== id));
+    deleteMaintenanceEvent(id);
     triggerToast('success', 'ลบแผนงานบำรุงรักษาเรียบร้อยแล้ว');
   };
 
@@ -232,6 +278,7 @@ export default function App() {
           totalMaintenanceAlerts={totalMaintenanceAlerts}
           onAlertClick={() => handleTabChange('maintenance')}
           assets={assets}
+          repairTickets={repairTickets}
           onSelectAsset={handleSelectAsset}
           triggerToast={triggerToast}
           onToggleSidebar={() => setIsMobileSidebarOpen(true)}
@@ -312,7 +359,7 @@ export default function App() {
             <AdminPortalView assets={assets} triggerToast={triggerToast} />
           )}
 
-          {activeTab === 'settings' && <SettingsView triggerToast={triggerToast} />}
+          {activeTab === 'settings' && <SettingsView triggerToast={triggerToast} totalAssets={assets.length} />}
         </main>
       </div>
     </div>

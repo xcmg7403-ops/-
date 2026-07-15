@@ -86,3 +86,12 @@ export interface UserSession {
   role: 'admin' | 'user';
   avatar: string;
 }
+
+export interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'user';
+  department: string;
+  status: 'Active' | 'Suspended';
+}

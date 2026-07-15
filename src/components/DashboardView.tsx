@@ -29,11 +29,24 @@ export default function DashboardView({
   onSelectAsset,
   onOpenAddModal
 }: DashboardViewProps) {
-  // Compute dynamic stats based on state with pre-seeded offsets for high-fidelity scale
-  const totalCount = 1277 + assets.length;
-  const activeCount = 1151 + assets.filter(a => a.status === 'In Use' || a.status === 'Available').length;
-  const repairCount = 39 + assets.filter(a => a.status === 'Repair').length;
-  const expiredCount = 84 + assets.filter(a => a.warrantyExpiryDate === 'Expired').length;
+  // Compute dynamic stats based on state - fully synchronized without arbitrary offsets
+  const totalCount = assets.length;
+  const activeCount = assets.filter(a => a.status === 'In Use' || a.status === 'Available').length;
+  const repairCount = assets.filter(a => a.status === 'Repair').length;
+  const expiredCount = assets.filter(a => a.warrantyExpiryDate === 'Expired' || (a.warrantyExpiryDate !== 'Expired' && a.warrantyExpiryDate && new Date(a.warrantyExpiryDate) < new Date())).length;
+
+  // Dynamic Category Calculations
+  const totalNotebook = assets.filter(a => a.category === 'Notebook').length;
+  const totalPc = assets.filter(a => a.category === 'PC').length;
+  const totalServer = assets.filter(a => a.category === 'Server').length;
+  const totalMonitor = assets.filter(a => a.category === 'Display' || a.category === 'Peripherals').length;
+
+  const sumCategories = totalNotebook + totalPc + totalServer + totalMonitor;
+
+  const percentNotebook = sumCategories > 0 ? Math.round((totalNotebook / sumCategories) * 100) : 0;
+  const percentPc = sumCategories > 0 ? Math.round((totalPc / sumCategories) * 100) : 0;
+  const percentServer = sumCategories > 0 ? Math.round((totalServer / sumCategories) * 100) : 0;
+  const percentMonitor = sumCategories > 0 ? Math.max(0, 100 - (percentNotebook + percentPc + percentServer)) : 0;
 
   // Render Category Icon Helper
   const getCategoryIcon = (category: string) => {
@@ -112,10 +125,10 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* Charts & Focus Bento Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Charts Layout */}
+      <div className="grid grid-cols-1 gap-6">
         {/* Category Distribution Card (Donut) */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm flex flex-col justify-between">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <h3 className="font-bold text-slate-800 font-sans">การกระจายประเภทครุภัณฑ์</h3>
             <span className="text-xs font-medium text-slate-400 font-sans">แบ่งตามสัดส่วน</span>
@@ -125,14 +138,14 @@ export default function DashboardView({
             <div className="relative w-40 h-40 flex-shrink-0">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                 <circle cx="18" cy="18" fill="transparent" r="16" stroke="#e2e8f0" strokeWidth="4"></circle>
-                {/* Laptops (45%) */}
-                <circle cx="18" cy="18" fill="transparent" r="16" stroke="#00236f" strokeWidth="4" strokeDasharray="45, 100" strokeDashoffset="0"></circle>
-                {/* Desktops (25%) */}
-                <circle cx="18" cy="18" fill="transparent" r="16" stroke="#0058be" strokeWidth="4" strokeDasharray="25, 100" strokeDashoffset="-45"></circle>
-                {/* Servers (20%) */}
-                <circle cx="18" cy="18" fill="transparent" r="16" stroke="#10b981" strokeWidth="4" strokeDasharray="20, 100" strokeDashoffset="-70"></circle>
-                {/* Monitors (10%) */}
-                <circle cx="18" cy="18" fill="transparent" r="16" stroke="#f59e0b" strokeWidth="4" strokeDasharray="10, 100" strokeDashoffset="-90"></circle>
+                {/* Laptops */}
+                <circle cx="18" cy="18" fill="transparent" r="16" stroke="#00236f" strokeWidth="4" strokeDasharray={`${percentNotebook}, 100`} strokeDashoffset="0"></circle>
+                {/* Desktops */}
+                <circle cx="18" cy="18" fill="transparent" r="16" stroke="#0058be" strokeWidth="4" strokeDasharray={`${percentPc}, 100`} strokeDashoffset={`-${percentNotebook}`}></circle>
+                {/* Servers */}
+                <circle cx="18" cy="18" fill="transparent" r="16" stroke="#10b981" strokeWidth="4" strokeDasharray={`${percentServer}, 100`} strokeDashoffset={`-${percentNotebook + percentPc}`}></circle>
+                {/* Monitors */}
+                <circle cx="18" cy="18" fill="transparent" r="16" stroke="#f59e0b" strokeWidth="4" strokeDasharray={`${percentMonitor}, 100`} strokeDashoffset={`-${percentNotebook + percentPc + percentServer}`}></circle>
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center select-none bg-transparent">
                 <span className="text-2xl font-bold text-primary font-sans">100%</span>
@@ -145,77 +158,32 @@ export default function DashboardView({
               <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl">
                 <span className="w-3.5 h-3.5 rounded-full bg-[#00236f] shrink-0"></span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-700 truncate">Notebooks (45%)</p>
-                  <p className="text-[11px] text-slate-400 font-medium">578 รายการ</p>
+                  <p className="text-xs font-semibold text-slate-700 truncate">Notebooks ({percentNotebook}%)</p>
+                  <p className="text-[11px] text-slate-400 font-medium">{totalNotebook} รายการ</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl">
                 <span className="w-3.5 h-3.5 rounded-full bg-[#0058be] shrink-0"></span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-700 truncate">PCs (25%)</p>
-                  <p className="text-[11px] text-slate-400 font-medium">321 รายการ</p>
+                  <p className="text-xs font-semibold text-slate-700 truncate">PCs ({percentPc}%)</p>
+                  <p className="text-[11px] text-slate-400 font-medium">{totalPc} รายการ</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl">
                 <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 shrink-0"></span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-700 truncate">Servers (20%)</p>
-                  <p className="text-[11px] text-slate-400 font-medium">257 รายการ</p>
+                  <p className="text-xs font-semibold text-slate-700 truncate">Servers ({percentServer}%)</p>
+                  <p className="text-[11px] text-slate-400 font-medium">{totalServer} รายการ</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl">
                 <span className="w-3.5 h-3.5 rounded-full bg-amber-500 shrink-0"></span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-700 truncate">Monitors (10%)</p>
-                  <p className="text-[11px] text-slate-400 font-medium">128 รายการ</p>
+                  <p className="text-xs font-semibold text-slate-700 truncate">Monitors ({percentMonitor}%)</p>
+                  <p className="text-[11px] text-slate-400 font-medium">{totalMonitor} รายการ</p>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Featured Hardware: Server Cluster Card */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm flex flex-col justify-between">
-          <div className="h-40 relative shrink-0">
-            <img
-              className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVOV1WtDsuvlnBwoDFMHccH1ta9HeTpd5I_PsSLuzYR4Q_j0m0tulHjJ6y9DQUWdnSw5I6egO9WAM3Y5ZtJKt4cJkuugJJCb4nS_3tbvV2LjD81e6SDxWADGSUW-Wwokh7rco3Gj1uscGPswnXmzYkkjEDTPcLRf8RSOyGpjerO5rZWEzqCUFn7o9qiU6P7hrjT2F17rvK_m2jfYPCNJhrHAA3ew4ySg_einR9CkHIt1dfqzlZmEWHMf_YAt1ChBu48_mF4aHZlw"
-              alt="Main Server Cluster B"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-            <div className="absolute bottom-4 left-4 text-white">
-              <span className="px-2 py-0.5 bg-secondary text-white text-[9px] rounded-lg uppercase font-bold tracking-widest">
-                Featured Node
-              </span>
-              <h4 className="text-lg font-bold mt-1 font-sans">Main Server Cluster B</h4>
-            </div>
-          </div>
-
-          <div className="p-5 flex-grow flex flex-col justify-between gap-4">
-            <div className="space-y-2.5">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">สถานะการทำงาน:</span>
-                <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[11px] font-bold">
-                  Stable
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">อุณหภูมิเฉลี่ย:</span>
-                <span className="font-bold text-slate-700">24°C</span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">Uptime ต่อเนื่อง:</span>
-                <span className="font-bold text-slate-700">142 วัน</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => alert('จำลองการทำงาน: เข้าสู่ระบบจัดการคลัสเตอร์เซิร์ฟเวอร์หลัก (Server Cluster B)')}
-              className="w-full py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
-            >
-              จัดการโหนดนี้
-            </button>
           </div>
         </div>
       </div>
