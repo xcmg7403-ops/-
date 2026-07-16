@@ -109,14 +109,14 @@ export default function App() {
   };
 
   // Auth Handlers
-  const handleLogin = (email: string, role: 'admin' | 'user', name: string) => {
+  const handleLogin = (email: string, role: 'admin' | 'user', name: string, avatar?: string) => {
     const session: UserSession = {
       email,
       role,
       name,
-      avatar: role === 'admin'
+      avatar: avatar || (role === 'admin'
         ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
-        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces'
+        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces')
     };
     setUser(session);
     localStorage.setItem('assetmanager_user', JSON.stringify(session));

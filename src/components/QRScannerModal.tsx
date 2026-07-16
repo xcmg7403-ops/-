@@ -26,7 +26,7 @@ export default function QRScannerModal({
   const [cameraErrorMessage, setCameraErrorMessage] = useState('');
   const [scannedResult, setScannedResult] = useState<string | null>(null);
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('environment');
 
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
 
@@ -38,17 +38,12 @@ export default function QRScannerModal({
       .then((devices) => {
         if (devices && devices.length > 0) {
           setAvailableCameras(devices);
-          setSelectedCameraId(devices[0].id);
-          setHasCameraError(false);
-        } else {
-          setHasCameraError(true);
-          setCameraErrorMessage('ไม่พบกล้องเชื่อมต่อกับอุปกรณ์นี้');
         }
       })
       .catch((err) => {
-        console.error('Failed to get cameras', err);
-        setHasCameraError(true);
-        setCameraErrorMessage('กรุณาอนุญาตการเข้าถึงกล้องถ่ายภาพในการตั้งค่าเบราว์เซอร์');
+        console.error('Failed to get cameras list:', err);
+        // We do not immediately set hasCameraError to true, because using facingMode: "environment" 
+        // can trigger the browser permission prompt and start successfully even if getCameras() returned empty.
       });
   }, [isOpen, activeTab]);
 
@@ -58,6 +53,9 @@ export default function QRScannerModal({
       cleanupScanner();
       return;
     }
+
+    setHasCameraError(false);
+    setCameraErrorMessage('');
 
     // Delay initialization slightly to ensure container element is fully rendered in DOM
     const initTimer = setTimeout(() => {
@@ -69,10 +67,14 @@ export default function QRScannerModal({
         qrReaderRef.current = html5QrCode;
         setIsScanning(true);
 
+        const cameraParam = (selectedCameraId === 'environment' || selectedCameraId === 'user')
+          ? { facingMode: selectedCameraId }
+          : selectedCameraId;
+
         html5QrCode.start(
-          selectedCameraId,
+          cameraParam,
           {
-            fps: 12,
+            fps: 15,
             qrbox: (width, height) => {
               const size = Math.min(width, height) * 0.7;
               return { width: size, height: size };
@@ -88,7 +90,7 @@ export default function QRScannerModal({
         ).catch((err) => {
           console.error('Start scan error:', err);
           setHasCameraError(true);
-          setCameraErrorMessage('ไม่สามารถเริ่มต้นกล้องได้ หรือกล้องกำลังถูกใช้งานโดยแอปพลิเคชันอื่น');
+          setCameraErrorMessage('ไม่สามารถเปิดใช้งานกล้องได้ กรุณาตรวจสอบว่าอนุญาตสิทธิ์เข้าถึงกล้องถ่ายภาพในการตั้งค่าเบราว์เซอร์แล้ว หรือลองเลือกสลับกล้องอีกครั้ง');
           setIsScanning(false);
         });
       } catch (err) {
@@ -261,22 +263,26 @@ export default function QRScannerModal({
           {activeTab === 'camera' ? (
             <div className="space-y-4">
               {/* Select Camera Source */}
-              {availableCameras.length > 1 && (
-                <div className="flex items-center gap-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">สลับกล้อง:</label>
-                  <select
-                    value={selectedCameraId}
-                    onChange={handleCameraChange}
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    {availableCameras.map((device, index) => (
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">เลือกกล้อง:</label>
+                <select
+                  value={selectedCameraId}
+                  onChange={handleCameraChange}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-[#00236f] cursor-pointer"
+                >
+                  <option value="environment">📷 กล้องหลัง (Back Camera / Auto)</option>
+                  <option value="user">🤳 กล้องหน้า (Front Camera)</option>
+                  {availableCameras.length > 0 && availableCameras.map((device, index) => {
+                    // Filter out generic labels if they match our presets, or just show them all
+                    if (device.label.toLowerCase().includes('front') || device.label.toLowerCase().includes('user')) return null;
+                    return (
                       <option key={device.deviceId} value={device.deviceId}>
-                        {device.label || `กล้องตัวที่ ${index + 1}`}
+                        🔌 {device.label || `กล้องเสริมตัวที่ ${index + 1}`}
                       </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                    );
+                  })}
+                </select>
+              </div>
 
               {/* Scanner Screen Box */}
               <div className="relative w-full aspect-square max-w-[280px] mx-auto bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-200/80 shadow-md flex flex-col items-center justify-center">

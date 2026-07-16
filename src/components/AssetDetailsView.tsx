@@ -22,7 +22,16 @@ import {
   MapPin,
   CheckCircle2,
   AlertCircle,
-  FileText
+  FileText,
+  Copy,
+  Check,
+  Layers,
+  Sliders,
+  ExternalLink,
+  X,
+  Upload,
+  Trash2,
+  Camera
 } from 'lucide-react';
 
 interface AssetDetailsViewProps {
@@ -43,14 +52,69 @@ export default function AssetDetailsView({
   // Modal State for quick inline edit
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  
+  // Custom QR Settings
+  const [qrColor, setQrColor] = useState<string>(() => localStorage.getItem('assetmanager_qr_color') || '#00236f');
+  const [qrMargin, setQrMargin] = useState<number>(() => {
+    const val = localStorage.getItem('assetmanager_qr_margin');
+    return val ? parseFloat(val) : 1.5;
+  });
+  const [isCopied, setIsCopied] = useState<boolean>(false);
+  
+  // Sticker Modal Settings
+  const [isStickerModalOpen, setIsStickerModalOpen] = useState<boolean>(false);
+  const [stickerFormat, setStickerFormat] = useState<'standard' | 'mini' | 'badge'>(() => 
+    (localStorage.getItem('assetmanager_sticker_format') as any) || 'standard'
+  );
+  const [showCorporate, setShowCorporate] = useState<boolean>(() => 
+    localStorage.getItem('assetmanager_show_corporate') !== 'false'
+  );
+  const [showCategory, setShowCategory] = useState<boolean>(() => 
+    localStorage.getItem('assetmanager_show_category') !== 'false'
+  );
+  const [showUser, setShowUser] = useState<boolean>(() => 
+    localStorage.getItem('assetmanager_show_user') !== 'false'
+  );
+  const [showDept, setShowDept] = useState<boolean>(() => 
+    localStorage.getItem('assetmanager_show_dept') !== 'false'
+  );
+
+  // Sync to LocalStorage on changes
+  useEffect(() => {
+    localStorage.setItem('assetmanager_qr_color', qrColor);
+  }, [qrColor]);
+
+  useEffect(() => {
+    localStorage.setItem('assetmanager_qr_margin', qrMargin.toString());
+  }, [qrMargin]);
+
+  useEffect(() => {
+    localStorage.setItem('assetmanager_sticker_format', stickerFormat);
+  }, [stickerFormat]);
+
+  useEffect(() => {
+    localStorage.setItem('assetmanager_show_corporate', showCorporate.toString());
+  }, [showCorporate]);
+
+  useEffect(() => {
+    localStorage.setItem('assetmanager_show_category', showCategory.toString());
+  }, [showCategory]);
+
+  useEffect(() => {
+    localStorage.setItem('assetmanager_show_user', showUser.toString());
+  }, [showUser]);
+
+  useEffect(() => {
+    localStorage.setItem('assetmanager_show_dept', showDept.toString());
+  }, [showDept]);
 
   useEffect(() => {
     if (asset.id) {
       QRCode.toDataURL(asset.id, {
         width: 300,
-        margin: 1.5,
+        margin: qrMargin,
         color: {
-          dark: '#00236f', // Match the deep primary theme color
+          dark: qrColor,
           light: '#ffffff'
         }
       })
@@ -61,7 +125,7 @@ export default function AssetDetailsView({
         console.error('Failed to generate QR Code:', err);
       });
     }
-  }, [asset.id]);
+  }, [asset.id, qrColor, qrMargin]);
 
   const downloadQRCode = () => {
     if (!qrCodeUrl) return;
@@ -74,7 +138,41 @@ export default function AssetDetailsView({
     triggerToast('success', `ดาวน์โหลดรูปภาพ QR Code ของครุภัณฑ์ ${asset.id} สำเร็จ`);
   };
 
+  const copyQRToClipboard = async () => {
+    try {
+      if (!qrCodeUrl) return;
+      const response = await fetch(qrCodeUrl);
+      const blob = await response.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': blob
+        })
+      ]);
+      setIsCopied(true);
+      triggerToast('success', 'คัดลอกรูปภาพ QR Code ไปยัง Clipboard สำเร็จ! คุณสามารถวางลงในเอกสารได้ทันที');
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy QR code to clipboard:', err);
+      // Fallback: copy ID text
+      try {
+        await navigator.clipboard.writeText(asset.id);
+        setIsCopied(true);
+        triggerToast('success', 'คัดลอกรหัสครุภัณฑ์ (Asset ID) ไปยัง Clipboard สำเร็จ');
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (clipErr) {
+        triggerToast('error', 'ไม่สามารถคัดลอกได้ในสภาพแวดล้อมนี้');
+      }
+    }
+  };
+
   const [isExporting, setIsExporting] = useState(false);
+
+  const handleDirectPrintLabel = () => {
+    triggerToast('info', 'กำลังเปิดการจัดพิมพ์ป้ายสติกเกอร์...');
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
 
   const exportToPDF = async () => {
     setIsExporting(true);
@@ -405,6 +503,16 @@ export default function AssetDetailsView({
   const [formPurchaseDate, setFormPurchaseDate] = useState(asset.purchaseDate || '');
   const [formExpiryDate, setFormExpiryDate] = useState(asset.warrantyExpiryDate || '');
   const [formImageUrl, setFormImageUrl] = useState(asset.imageUrl || '');
+  const [formDisplay, setFormDisplay] = useState(() => {
+    if (!asset.detailedSpecs) return '';
+    const found = asset.detailedSpecs.find(s => s.item.toLowerCase() === 'display');
+    return found ? found.details : '';
+  });
+  const [formOSVersion, setFormOSVersion] = useState(() => {
+    if (!asset.detailedSpecs) return '';
+    const found = asset.detailedSpecs.find(s => s.item.toLowerCase() === 'os version');
+    return found ? found.details : '';
+  });
 
   // Sync form states with asset prop changes
   useEffect(() => {
@@ -431,11 +539,43 @@ export default function AssetDetailsView({
     setFormPurchaseDate(asset.purchaseDate || '');
     setFormExpiryDate(asset.warrantyExpiryDate || '');
     setFormImageUrl(asset.imageUrl || '');
+
+    const foundDisplay = asset.detailedSpecs?.find(s => s.item.toLowerCase() === 'display');
+    setFormDisplay(foundDisplay ? foundDisplay.details : '');
+    const foundOSVersion = asset.detailedSpecs?.find(s => s.item.toLowerCase() === 'os version');
+    setFormOSVersion(foundOSVersion ? foundOSVersion.details : '');
   }, [asset]);
 
   // Handle save of inline edits
   const handleSaveInline = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Rebuild detailedSpecs with Display and OS Version
+    let currentSpecs = asset.detailedSpecs ? [...asset.detailedSpecs] : [];
+    
+    // Update or add 'Display'
+    const displayIndex = currentSpecs.findIndex(s => s.item.toLowerCase() === 'display');
+    if (formDisplay.trim()) {
+      if (displayIndex >= 0) {
+        currentSpecs[displayIndex] = { ...currentSpecs[displayIndex], details: formDisplay };
+      } else {
+        currentSpecs.push({ item: 'Display', details: formDisplay, status: 'Optimal Performance' });
+      }
+    } else if (displayIndex >= 0) {
+      currentSpecs.splice(displayIndex, 1);
+    }
+
+    // Update or add 'OS Version'
+    const osVerIndex = currentSpecs.findIndex(s => s.item.toLowerCase() === 'os version');
+    if (formOSVersion.trim()) {
+      if (osVerIndex >= 0) {
+        currentSpecs[osVerIndex] = { ...currentSpecs[osVerIndex], details: formOSVersion };
+      } else {
+        currentSpecs.push({ item: 'OS Version', details: formOSVersion, status: 'Up to date' });
+      }
+    } else if (osVerIndex >= 0) {
+      currentSpecs.splice(osVerIndex, 1);
+    }
 
     const updatedAsset: Asset = {
       ...asset,
@@ -461,12 +601,85 @@ export default function AssetDetailsView({
       purchaseOrder: formPO || undefined,
       purchaseDate: formPurchaseDate || undefined,
       warrantyExpiryDate: formExpiryDate || undefined,
-      imageUrl: formImageUrl || undefined
+      imageUrl: formImageUrl || undefined,
+      detailedSpecs: currentSpecs.length > 0 ? currentSpecs : undefined
     };
 
     onEditAsset(updatedAsset);
     setIsEditOpen(false);
     triggerToast('success', `อัปเดตรายละเอียดครุภัณฑ์ ${asset.id} สำเร็จแล้ว`);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show toast for loading state
+    triggerToast('info', 'กำลังประมวลผลรูปภาพ...');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Create canvas to resize image
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Max size 500px to ensure it fits in firestore easily
+        const MAX_SIZE = 500;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // Draw image to canvas
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85); // 85% quality JPEG
+          
+          // Trigger save
+          const updatedAsset: Asset = {
+            ...asset,
+            imageUrl: compressedDataUrl
+          };
+          onEditAsset(updatedAsset);
+          triggerToast('success', 'อัปโหลดและบันทึกรูปภาพครุภัณฑ์เรียบร้อยแล้ว');
+        } else {
+          triggerToast('error', 'ไม่สามารถประมวลผลรูปภาพได้');
+        }
+      };
+      img.onerror = () => {
+        triggerToast('error', 'ไฟล์รูปภาพไม่ถูกต้องหรือเสียหาย');
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => {
+      triggerToast('error', 'ไม่สามารถอ่านไฟล์ได้');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering file input click
+    if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพของครุภัณฑ์นี้?')) {
+      const updatedAsset: Asset = {
+        ...asset,
+        imageUrl: undefined
+      };
+      onEditAsset(updatedAsset);
+      triggerToast('success', 'ลบรูปภาพครุภัณฑ์เรียบร้อยแล้ว');
+    }
   };
 
   const getCategoryIcon = (category: string) => {
@@ -515,14 +728,18 @@ export default function AssetDetailsView({
             <span>{isExporting ? 'กำลังส่งออก...' : 'Export Audit PDF'}</span>
           </button>
           <button
-            onClick={() => {
-              window.print();
-              triggerToast('info', 'กำลังจัดส่งคำสั่งพิมพ์สติกเกอร์บาร์โค้ด QR Code...');
-            }}
+            onClick={handleDirectPrintLabel}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#00236f] hover:bg-primary text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-sky-200" />
+            <span>Print Label</span>
+          </button>
+          <button
+            onClick={() => setIsStickerModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
           >
-            <Printer className="w-4 h-4 text-slate-400" />
-            <span>Print Label (QR)</span>
+            <Sliders className="w-4 h-4 text-slate-400" />
+            <span>Customize Sticker</span>
           </button>
           <button
             onClick={() => onTriggerLogRepair(asset.id)}
@@ -552,18 +769,51 @@ export default function AssetDetailsView({
           </div>
 
           {/* Asset Image Box */}
-          <div className="w-full md:w-1/3 aspect-square rounded-2xl border border-slate-100 overflow-hidden bg-slate-50 flex items-center justify-center shrink-0 shadow-inner">
+          <div 
+            onClick={() => document.getElementById('asset-image-file-input')?.click()}
+            className="w-full md:w-1/3 aspect-square rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center shrink-0 shadow-sm relative group cursor-pointer hover:border-[#00236f] transition-all duration-300"
+            title="คลิกเพื่ออัปโหลดหรือถ่ายภาพครุภัณฑ์"
+          >
+            <input 
+              type="file" 
+              accept="image/*" 
+              id="asset-image-file-input" 
+              className="hidden" 
+              onChange={handleImageUpload} 
+            />
             {asset.imageUrl ? (
-              <img
-                className="w-full h-full object-cover"
-                src={asset.imageUrl}
-                alt={asset.name}
-                referrerPolicy="no-referrer"
-              />
+              <>
+                <img
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  src={asset.imageUrl}
+                  alt={asset.name}
+                  referrerPolicy="no-referrer"
+                />
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2 text-white">
+                  <div className="flex items-center gap-1.5 bg-white/20 px-3 py-1.5 rounded-full backdrop-blur-xs text-xs font-bold hover:bg-white/30 transition-colors">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>เปลี่ยนรูปภาพ</span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveImage(e);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-rose-200 hover:text-rose-100 hover:bg-rose-500/20 rounded-md transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>ลบรูปภาพ</span>
+                  </button>
+                </div>
+              </>
             ) : (
-              <div className="flex flex-col items-center gap-2 text-slate-300">
-                {getCategoryIcon(asset.category)}
-                <span className="text-[10px] font-bold uppercase tracking-wider">No Photo</span>
+              <div className="flex flex-col items-center justify-center text-slate-400 p-4 text-center group-hover:text-[#00236f] transition-colors">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:bg-[#00236f]/5 transition-all">
+                  <Upload className="w-6 h-6 text-slate-400 group-hover:text-[#00236f] transition-colors" />
+                </div>
+                <span className="text-xs font-bold text-slate-700 block">อัปโหลดรูปภาพ</span>
+                <span className="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">คลิกเพื่อ ถ่ายภาพจากกล้อง หรือ เลือกไฟล์รูปภาพ</span>
               </div>
             )}
           </div>
@@ -586,8 +836,8 @@ export default function AssetDetailsView({
               <h3 className="text-xl font-bold text-slate-800 font-sans tracking-tight mb-2">
                 {asset.name}
               </h3>
-              <p className="text-xs text-slate-400 font-medium font-mono">Model: {asset.serialNumber ? 'Standard Hardware' : 'N/A'}</p>
-              <p className="text-xs text-slate-400 font-semibold font-mono mt-0.5">Serial: {asset.serialNumber}</p>
+              <p className="text-xs text-slate-400 font-medium font-mono">Model: {asset.brand && asset.model ? `${asset.brand} ${asset.model}` : 'Standard Hardware'}</p>
+              <p className="text-xs text-slate-400 font-semibold font-mono mt-0.5">Serial: {asset.serialNumber || 'N/A'}</p>
             </div>
 
             {/* Quick specifications grid cards */}
@@ -610,38 +860,183 @@ export default function AssetDetailsView({
                 <span className="text-[9px] text-slate-400 font-medium">SSD / Disk</span>
               </div>
             </div>
+
+            {/* Detailed Technical Specs Panel */}
+            <div className="pt-4 border-t border-slate-200 bg-slate-50/60 p-5 rounded-2xl space-y-4">
+              <span className="text-xs font-bold text-[#00236f] uppercase tracking-wider block border-b border-slate-100 pb-2">📋 ข้อมูลทางเทคนิคโดยละเอียด (DETAILED SPECS)</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                {asset.specOS && (
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                    <span className="text-slate-500 font-medium">ระบบปฏิบัติการ (OS):</span>
+                    <span className="font-bold text-slate-800 text-sm">{asset.specOS}</span>
+                  </div>
+                )}
+                {asset.ipAddress && (
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                    <span className="text-slate-500 font-medium">IP Address:</span>
+                    <span className="font-mono font-bold text-slate-800 text-sm">{asset.ipAddress}</span>
+                  </div>
+                )}
+                {asset.macWifi && (
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                    <span className="text-slate-500 font-medium">MAC WiFi:</span>
+                    <span className="font-mono font-bold text-slate-800 text-sm">{asset.macWifi}</span>
+                  </div>
+                )}
+                {asset.macLan && (
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                    <span className="text-slate-500 font-medium">MAC LAN:</span>
+                    <span className="font-mono font-bold text-slate-800 text-sm">{asset.macLan}</span>
+                  </div>
+                )}
+                {asset.division && (
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                    <span className="text-slate-500 font-medium">ฝ่ายงาน (Division):</span>
+                    <span className="font-bold text-slate-800 text-sm">{asset.division}</span>
+                  </div>
+                )}
+                {asset.remarks && (
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-100 md:col-span-2">
+                    <span className="text-slate-500 font-medium">หมายเหตุ (Remarks):</span>
+                    <span className="font-bold text-slate-700 text-sm truncate max-w-[400px]" title={asset.remarks}>{asset.remarks}</span>
+                  </div>
+                )}
+                {asset.detailedSpecs && asset.detailedSpecs.map((spec, index) => (
+                  <div key={index} className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                    <span className="text-slate-500 font-medium">{spec.item}:</span>
+                    <span className="font-bold text-slate-800 text-sm">{spec.details}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* QR Code and Tag Label Card (Bento Area 2 - col-4) */}
-        <div className="col-span-12 lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-6 flex flex-col items-center justify-center text-center shadow-sm animate-in fade-in zoom-in-95 duration-300">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Asset Tag QR</p>
-          
-          <div className="p-3.5 bg-slate-50 border-4 border-slate-100 rounded-2xl mb-4 shadow-inner flex items-center justify-center min-h-[120px] min-w-[120px]">
-            {qrCodeUrl ? (
-              <img
-                className="w-28 h-28 mix-blend-multiply"
-                src={qrCodeUrl}
-                alt={`QR code tag for ${asset.id}`}
-              />
-            ) : (
-              <div className="w-28 h-28 flex items-center justify-center text-xs text-slate-300">
-                Generating...
+        <div className="col-span-12 lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-6 flex flex-col justify-between shadow-sm animate-in fade-in zoom-in-95 duration-300">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asset Tag QR Studio</span>
+              <span className="text-[9px] font-bold bg-[#00236f]/5 text-[#00236f] px-2 py-0.5 rounded-md">Real-Time</span>
+            </div>
+
+            {/* QR Code Canvas */}
+            <div className="relative flex flex-col items-center py-2">
+              <div className="p-4 bg-white border-2 border-slate-100 rounded-3xl shadow-sm hover:shadow-md transition-shadow flex items-center justify-center min-h-[160px] min-w-[160px] relative group">
+                {qrCodeUrl ? (
+                  <img
+                    className="w-36 h-36 object-contain"
+                    src={qrCodeUrl}
+                    alt={`QR code tag for ${asset.id}`}
+                  />
+                ) : (
+                  <div className="w-36 h-36 flex items-center justify-center text-xs text-slate-400 font-mono">
+                    Generating...
+                  </div>
+                )}
               </div>
-            )}
+
+              <div className="mt-3 text-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Encoded ID</span>
+                <p className="font-mono text-xs font-bold text-[#00236f] bg-[#00236f]/5 border border-[#00236f]/10 px-3 py-1 rounded-xl select-all inline-block">
+                  {asset.id}
+                </p>
+              </div>
+            </div>
+
+            {/* Color Customizer */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sliders className="w-3 h-3" />
+                <span>โทนสีป้าย QR (QR Theme Color)</span>
+              </label>
+              <div className="flex items-center gap-2">
+                {[
+                  { name: 'Navy Blue', hex: '#00236f' },
+                  { name: 'Slate Black', hex: '#0f172a' },
+                  { name: 'Emerald', hex: '#10b981' },
+                  { name: 'Crimson', hex: '#e11d48' },
+                ].map((color) => (
+                  <button
+                    key={color.hex}
+                    onClick={() => {
+                      setQrColor(color.hex);
+                      triggerToast('info', `ปรับเปลี่ยนสีรหัส QR เป็นโทนสี ${color.name}`);
+                    }}
+                    style={{ backgroundColor: color.hex }}
+                    title={color.name}
+                    className={`w-6 h-6 rounded-full cursor-pointer transition-transform duration-150 relative ${
+                      qrColor === color.hex ? 'scale-125 ring-2 ring-offset-2 ring-primary' : 'hover:scale-110'
+                    }`}
+                  >
+                    {qrColor === color.hex && (
+                      <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-bold">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Margin/Density settings */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="w-3 h-3" />
+                <span>ขอบขอบป้าย (QR Margins)</span>
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { label: 'ขอบบาง', margin: 0.5 },
+                  { label: 'ปกติ', margin: 1.5 },
+                  { label: 'ขอบหนา', margin: 3.5 },
+                ].map((item) => (
+                  <button
+                    key={item.margin}
+                    onClick={() => {
+                      setQrMargin(item.margin);
+                    }}
+                    className={`py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                      qrMargin === item.margin
+                        ? 'bg-[#00236f]/5 border-[#00236f] text-[#00236f]'
+                        : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <p className="font-mono text-xs font-bold text-primary bg-primary/5 border border-primary/10 px-3 py-1 rounded-xl mb-4 select-all">
-            {asset.id}
-          </p>
+          {/* Practical Utilities Row */}
+          <div className="space-y-2 pt-4 border-t border-slate-100 mt-4">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={copyQRToClipboard}
+                className="flex items-center justify-center gap-1.5 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-[11px] font-bold rounded-xl transition-all cursor-pointer"
+              >
+                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                <span>{isCopied ? 'คัดลอกแล้ว' : 'คัดลอกรูป QR'}</span>
+              </button>
+              <button
+                onClick={downloadQRCode}
+                className="flex items-center justify-center gap-1.5 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-[11px] font-bold rounded-xl transition-all cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-400" />
+                <span>ดาวน์โหลดรูป</span>
+              </button>
+            </div>
 
-          <button
-            onClick={downloadQRCode}
-            className="text-xs font-bold text-secondary hover:text-primary inline-flex items-center gap-1 cursor-pointer hover:underline transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download QR Code Image</span>
-          </button>
+            <button
+              onClick={() => setIsStickerModalOpen(true)}
+              className="w-full py-2.5 bg-[#00236f] hover:bg-primary text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md shadow-slate-200"
+            >
+              <Printer className="w-4 h-4 text-sky-300" />
+              <span>พิมพ์สติกเกอร์บาร์โค้ดด่วน</span>
+            </button>
+            <p className="text-[9px] text-slate-400 text-center leading-normal">
+              * รหัส QR โค้ดนี้สามารถใช้งานร่วมกับเครื่องปืนยิงสแกน และแท็บกล้องสแกนเพื่อตรวจสอบความถูกต้องระหว่างลงตรวจสภาพครุภัณฑ์
+            </p>
+          </div>
         </div>
 
         {/* Purchase Info Card (Bento Area 3 - col-4) */}
@@ -767,156 +1162,6 @@ export default function AssetDetailsView({
           </div>
         </div>
 
-        {/* Detailed Technical Specs Table (Bento Area 6 - col-12) */}
-        <div className="col-span-12 bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
-          <div className="px-6 py-4.5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-            <h4 className="font-bold text-slate-800 font-sans text-sm">
-              ข้อมูลทางเทคนิคโดยละเอียด (Detailed Technical Specs)
-            </h4>
-            <span className="text-[10px] font-bold text-slate-400 uppercase font-mono">system hardware report</span>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/20 text-slate-400 border-b border-slate-100">
-                  <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">Specification Item</th>
-                  <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">Details</th>
-                  <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">Status / Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-600">
-                {/* Brand */}
-                {asset.brand && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">ยี่ห้อ (Brand)</td>
-                    <td className="px-6 py-3.5">{asset.brand}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>ข้อมูลลงทะเบียน</span>
-                    </td>
-                  </tr>
-                )}
-                {/* Model */}
-                {asset.model && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">รุ่น (Model)</td>
-                    <td className="px-6 py-3.5">{asset.model}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>ข้อมูลลงทะเบียน</span>
-                    </td>
-                  </tr>
-                )}
-                {/* OS */}
-                {asset.specOS && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">ระบบปฏิบัติการ (OS)</td>
-                    <td className="px-6 py-3.5">{asset.specOS}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>ข้อมูลลงทะเบียน</span>
-                    </td>
-                  </tr>
-                )}
-                {/* Division */}
-                {asset.division && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">ฝ่าย (Division)</td>
-                    <td className="px-6 py-3.5">{asset.division}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>ข้อมูลลงทะเบียน</span>
-                    </td>
-                  </tr>
-                )}
-                {/* Responsible */}
-                {asset.responsiblePerson && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">ผู้รับผิดชอบ (Responsible Person)</td>
-                    <td className="px-6 py-3.5">{asset.responsiblePerson}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>ผู้ถือครองสิทธิ์</span>
-                    </td>
-                  </tr>
-                )}
-                {/* IP Address */}
-                {asset.ipAddress && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">IP ADDRESS</td>
-                    <td className="px-6 py-3.5 font-mono">{asset.ipAddress}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>การเชื่อมต่อเครือข่าย</span>
-                    </td>
-                  </tr>
-                )}
-                {/* MAC Wifi */}
-                {asset.macWifi && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">MAC WIFI</td>
-                    <td className="px-6 py-3.5 font-mono">{asset.macWifi}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>การเชื่อมต่อเครือข่าย</span>
-                    </td>
-                  </tr>
-                )}
-                {/* MAC Lan */}
-                {asset.macLan && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">MAC LAN</td>
-                    <td className="px-6 py-3.5 font-mono">{asset.macLan}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>การเชื่อมต่อเครือข่าย</span>
-                    </td>
-                  </tr>
-                )}
-                {/* Remarks */}
-                {asset.remarks && (
-                  <tr className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-slate-800">หมายเหตุ (Remarks)</td>
-                    <td className="px-6 py-3.5">{asset.remarks}</td>
-                    <td className="px-6 py-3.5 text-[#004942] font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>บันทึกเพิ่มเติม</span>
-                    </td>
-                  </tr>
-                )}
-
-                {asset.detailedSpecs && asset.detailedSpecs.length > 0 ? (
-                  asset.detailedSpecs.map((spec, index) => {
-                    return (
-                      <tr key={index} className="hover:bg-slate-50/30 transition-colors">
-                        <td className="px-6 py-3.5 font-bold text-slate-800">{spec.item}</td>
-                        <td className="px-6 py-3.5">{spec.details}</td>
-                        <td className="px-6 py-3.5 text-secondary font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                          <span>{spec.status}</span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <>
-                    <tr className="hover:bg-slate-50/30 transition-colors">
-                      <td className="px-6 py-3.5 font-bold text-slate-800">Display Support</td>
-                      <td className="px-6 py-3.5">Standard Display Connector Port Supported</td>
-                      <td className="px-6 py-3.5 text-emerald-600 font-semibold">Verified Hardware</td>
-                    </tr>
-                    <tr className="hover:bg-slate-50/30 transition-colors">
-                      <td className="px-6 py-3.5 font-bold text-slate-800">Power Rating</td>
-                      <td className="px-6 py-3.5">Standard Output Wattage verified</td>
-                      <td className="px-6 py-3.5 text-emerald-600 font-semibold">Optimal Power</td>
-                    </tr>
-                  </>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
 
       {/* QUICK INLINE EDIT MODAL */}
@@ -1210,6 +1455,28 @@ export default function AssetDetailsView({
                           placeholder="เช่น 512GB NVMe SSD, 1TB SSD"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">หน้าจอแสดงผล (Display)</label>
+                        <input
+                          type="text"
+                          value={formDisplay}
+                          onChange={(e) => setFormDisplay(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                          placeholder="เช่น FHD IPS Screen, Retina XDR Display"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">เวอร์ชันระบบปฏิบัติการ (OS Version)</label>
+                        <input
+                          type="text"
+                          value={formOSVersion}
+                          onChange={(e) => setFormOSVersion(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                          placeholder="เช่น Windows 11 23H2, OS preinstalled"
+                        />
+                      </div>
                     </div>
 
                     <h4 className="text-xs font-bold text-primary border-b border-slate-100 pt-3 pb-1">ที่อยู่เครือข่าย & บันทึกเพิ่มเติม</h4>
@@ -1282,6 +1549,443 @@ export default function AssetDetailsView({
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Sticker Print Wizard Modal */}
+      {isStickerModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="p-4 bg-[#00236f] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2">
+                <Printer className="w-5 h-5 text-sky-400 animate-pulse" />
+                <h3 className="font-bold text-sm font-sans tracking-wide">เครื่องมือพิมพ์สติกเกอร์ครุภัณฑ์อัจฉริยะ (Asset Tag Sticker Studio)</h3>
+              </div>
+              <button
+                onClick={() => setIsStickerModalOpen(false)}
+                className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 overflow-y-auto flex-grow divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+              
+              {/* Left Column: Settings & Config (5 cols) */}
+              <div className="lg:col-span-5 p-6 space-y-6 text-left">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3">1. เลือกรูปแบบป้าย (Label Format)</h4>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'standard', title: 'Standard Tag (76 x 50 mm)', desc: 'ขนาดมาตรฐาน คมชัด มีข้อมูลครบถ้วนสำหรับติดเคส/หน้าจอ' },
+                      { id: 'mini', title: 'Compact Tag (50 x 25 mm)', desc: 'ขนาดจิ๋วสำหรับอุปกรณ์ขนาดเล็ก เช่น อะแดปเตอร์ หรือเมาส์' },
+                      { id: 'badge', title: 'Full Spec Badge (100 x 75 mm)', desc: 'ขนาดใหญ่แสดงสเปกเทคนิคและประวัติสำหรับเซิร์ฟเวอร์/ตู้แร็ค' }
+                    ].map((format) => (
+                      <button
+                        key={format.id}
+                        type="button"
+                        onClick={() => setStickerFormat(format.id as any)}
+                        className={`w-full p-3.5 text-left rounded-xl border transition-all cursor-pointer flex flex-col gap-1 ${
+                          stickerFormat === format.id
+                            ? 'border-[#00236f] bg-[#00236f]/5 ring-1 ring-[#00236f]'
+                            : 'border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={`text-xs font-bold ${stickerFormat === format.id ? 'text-[#00236f]' : 'text-slate-700'}`}>
+                          {format.title}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium leading-normal">{format.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-5">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3">2. ปรับแต่งเนื้อหา (Sticker Details)</h4>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100/70 transition-colors cursor-pointer text-xs font-medium text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={showCorporate}
+                        onChange={(e) => setShowCorporate(e.target.checked)}
+                        className="rounded text-[#00236f] focus:ring-primary w-4 h-4"
+                      />
+                      <span>แสดงหัวชื่อหน่วยงาน (🏢 IT DEPT LABEL)</span>
+                    </label>
+                    <label className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100/70 transition-colors cursor-pointer text-xs font-medium text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={showCategory}
+                        onChange={(e) => setShowCategory(e.target.checked)}
+                        className="rounded text-[#00236f] focus:ring-primary w-4 h-4"
+                      />
+                      <span>แสดงไอคอนหมวดหมู่ครุภัณฑ์ (Category Icon)</span>
+                    </label>
+                    <label className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100/70 transition-colors cursor-pointer text-xs font-medium text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={showUser}
+                        onChange={(e) => setShowUser(e.target.checked)}
+                        className="rounded text-[#00236f] focus:ring-primary w-4 h-4"
+                      />
+                      <span>แสดงชื่อผู้ถือครอง/ผู้รับผิดชอบหลัก (Assignee)</span>
+                    </label>
+                    <label className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100/70 transition-colors cursor-pointer text-xs font-medium text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={showDept}
+                        onChange={(e) => setShowDept(e.target.checked)}
+                        className="rounded text-[#00236f] focus:ring-primary w-4 h-4"
+                      />
+                      <span>แสดงหน่วยงาน / สถานที่ติดตั้ง (Department)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200/50 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">💡 วิธีการพิมพ์ที่เหมาะสม</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed font-medium font-sans">
+                    เมื่อกด <b>"พิมพ์ป้ายแท็ก"</b> ระบบจะตัดส่วนแอปพลิเคชันทั้งหมดออก และส่งสติกเกอร์ตรงไปยังกล่องโต้ตอบการพิมพ์ของเครื่องพิมพ์สติกเกอร์ (Thermal Label Printer) ของคุณโดยตรง
+                  </p>
+                </div>
+              </div>
+
+              {/* Right Column: Dynamic Preview Area (7 cols) */}
+              <div className="lg:col-span-7 p-6 bg-slate-50/50 flex flex-col justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 text-left">3. ตัวอย่างก่อนพิมพ์ (Sticker Print Preview)</h4>
+                  
+                  {/* Outer Frame with sticker cut lines */}
+                  <div className="border border-dashed border-slate-300 rounded-2xl bg-white p-8 shadow-inner flex items-center justify-center min-h-[300px]">
+                    
+                    {/* Isolated Printable Block */}
+                    <div
+                      id="sticker-print-area"
+                      className={`bg-white text-black border border-black p-4 select-none flex ${
+                        stickerFormat === 'standard'
+                          ? 'w-[360px] h-[240px] flex-row items-center justify-between gap-4'
+                          : stickerFormat === 'mini'
+                          ? 'w-[280px] h-[140px] flex-row items-center justify-center gap-4'
+                          : 'w-[400px] h-[300px] flex-col justify-between'
+                      }`}
+                    >
+                      {/* CSS media print injection */}
+                      <style>{`
+                        @media print {
+                          body * {
+                            visibility: hidden;
+                          }
+                          #sticker-print-area, #sticker-print-area * {
+                            visibility: visible;
+                          }
+                          #sticker-print-area {
+                            position: absolute;
+                            left: 50% !important;
+                            top: 50% !important;
+                            transform: translate(-50%, -50%) !important;
+                            width: ${stickerFormat === 'standard' ? '360px' : stickerFormat === 'mini' ? '280px' : '400px'} !important;
+                            height: ${stickerFormat === 'standard' ? '240px' : stickerFormat === 'mini' ? '140px' : '300px'} !important;
+                            margin: 0 !important;
+                            padding: 16px !important;
+                            border: 2px solid black !important;
+                            background: white !important;
+                            box-shadow: none !important;
+                          }
+                        }
+                      `}</style>
+
+                      {stickerFormat === 'standard' && (
+                        <>
+                          <div className="flex-1 flex flex-col justify-between h-full py-1 text-left">
+                            <div className="space-y-1">
+                              {showCorporate && (
+                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-800 border-b border-black pb-0.5 mb-1.5 font-sans">
+                                  🏢 IT ASSET SECURITY TAG
+                                </p>
+                              )}
+                              <p className="text-xs font-black text-black leading-tight line-clamp-2 uppercase font-sans">
+                                {asset.name}
+                              </p>
+                              <p className="text-[10px] font-bold text-slate-500 font-sans">
+                                Cat: {asset.category} {showCategory && '• '}{showCategory && asset.brand}
+                              </p>
+                              {showUser && (
+                                <p className="text-[10px] font-bold text-slate-700 leading-tight font-sans">
+                                  User: {asset.responsiblePerson || 'Central IT'}
+                                </p>
+                              )}
+                              {showDept && (
+                                <p className="text-[9px] font-medium text-slate-500 leading-none font-sans">
+                                  Loc: {asset.department || '-'}
+                                </p>
+                              )}
+                            </div>
+                            <div className="mt-2 pt-1 border-t border-dashed border-slate-300">
+                              <span className="text-[8px] font-bold text-slate-400 block font-sans">SERIAL NO.</span>
+                              <p className="font-mono text-[10px] font-bold text-black">{asset.serialNumber || 'N/A'}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col items-center justify-center shrink-0 border-l border-slate-200 pl-4 h-full">
+                            {qrCodeUrl ? (
+                              <img className="w-28 h-28 mix-blend-multiply shrink-0" src={qrCodeUrl} alt="QR code" />
+                            ) : (
+                              <div className="w-24 h-24 bg-slate-100 flex items-center justify-center text-[10px]">QR Generating</div>
+                            )}
+                            <p className="font-mono font-black text-[11px] text-black tracking-wide mt-1 select-all">{asset.id}</p>
+                          </div>
+                        </>
+                      )}
+
+                      {stickerFormat === 'mini' && (
+                        <>
+                          <div className="shrink-0">
+                            {qrCodeUrl ? (
+                              <img className="w-20 h-20 mix-blend-multiply" src={qrCodeUrl} alt="QR code" />
+                            ) : (
+                              <div className="w-16 h-16 bg-slate-100" />
+                            )}
+                          </div>
+                          <div className="flex-grow flex flex-col justify-center text-left py-1">
+                            <p className="font-mono font-black text-[13px] text-black tracking-wider leading-none mb-1 select-all">
+                              {asset.id}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-800 line-clamp-1 font-sans">{asset.name}</p>
+                            <p className="text-[9px] text-slate-500 font-bold font-sans">SN: {asset.serialNumber || 'N/A'}</p>
+                          </div>
+                        </>
+                      )}
+
+                      {stickerFormat === 'badge' && (
+                        <>
+                          {/* Badge layout */}
+                          <div className="flex justify-between items-start border-b-2 border-black pb-2 w-full">
+                            <div className="text-left">
+                              {showCorporate && <p className="text-[10px] font-black tracking-widest text-slate-800 font-sans">🏢 GOVERNMENT IT ASSET CONTROL</p>}
+                              <h5 className="text-sm font-black text-black leading-tight uppercase font-sans mt-0.5">{asset.name}</h5>
+                            </div>
+                            <span className="text-xs font-mono font-black bg-black text-white px-2 py-0.5 rounded select-all shrink-0">{asset.id}</span>
+                          </div>
+
+                          <div className="grid grid-cols-12 gap-3 py-3 items-center flex-grow w-full">
+                            <div className="col-span-8 space-y-1.5 text-left text-[11px] font-bold text-slate-700 font-sans">
+                              <p><span className="text-slate-400 font-medium">หมวดหมู่ (Category):</span> {asset.category}</p>
+                              <p><span className="text-slate-400 font-medium">รุ่น / แบรนด์ (Model):</span> {asset.brand} - {asset.model}</p>
+                              <p><span className="text-slate-400 font-medium">หมายเลขซีเรียล (Serial):</span> {asset.serialNumber}</p>
+                              {showUser && <p><span className="text-slate-400 font-medium">ผู้ถือครอง (Assignee):</span> {asset.responsiblePerson || 'Central IT'}</p>}
+                              {showDept && <p><span className="text-slate-400 font-medium">หน่วยงาน (Dept):</span> {asset.department}</p>}
+                            </div>
+                            <div className="col-span-4 flex justify-end">
+                              {qrCodeUrl ? (
+                                <img className="w-24 h-24 mix-blend-multiply shrink-0" src={qrCodeUrl} alt="QR code" />
+                              ) : (
+                                <div className="w-24 h-24 bg-slate-100 flex items-center justify-center text-[10px]">QR Generating</div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="border-t border-black pt-2 flex justify-between items-center text-[9px] font-bold text-slate-400 font-sans w-full">
+                            <span>ระบบขึ้นทะเบียนกลาง (IT Inventory Management)</span>
+                            <span>พิมพ์เมื่อ: {new Date().toLocaleDateString('th-TH')}</span>
+                          </div>
+                        </>
+                      )}
+
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Print button bar */}
+                <div className="flex gap-3 justify-end pt-4 border-t border-slate-100 bg-white p-4 rounded-xl mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsStickerModalOpen(false)}
+                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    ปิดหน้าต่าง
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.print();
+                      triggerToast('success', `คำสั่งพิมพ์สำหรับครุภัณฑ์ ${asset.id} ถูกส่งไปยังเครื่องพิมพ์เรียบร้อยแล้ว`);
+                    }}
+                    className="px-6 py-2.5 bg-[#00236f] hover:bg-primary text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Printer className="w-4 h-4 text-sky-300" />
+                    <span>สั่งพิมพ์ป้ายสติกเกอร์</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* DIRECT PRINTABLE LABEL (Hidden on screen, styled specifically for @media print) */}
+      {!isStickerModalOpen && (
+        <div id="direct-printable-label" className="hidden">
+          <style>{`
+            @media print {
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #fff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              body * {
+                visibility: hidden !important;
+              }
+              #direct-printable-label, #direct-printable-label * {
+                visibility: visible !important;
+              }
+              #direct-printable-label {
+                display: block !important;
+                position: absolute !important;
+                left: 50% !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                width: 360px !important;
+                height: 240px !important;
+                border: 2px solid #000 !important;
+                border-radius: 8px !important;
+                padding: 16px !important;
+                background: #fff !important;
+                box-shadow: none !important;
+                box-sizing: border-box !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+              }
+              .direct-print-flex {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                height: 100% !important;
+                gap: 16px !important;
+              }
+              .direct-print-info {
+                flex: 1 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                height: 100% !important;
+                text-align: left !important;
+              }
+              .direct-print-header {
+                font-size: 9px !important;
+                font-weight: 900 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.05em !important;
+                border-bottom: 2px solid #000 !important;
+                padding-bottom: 4px !important;
+                margin-bottom: 8px !important;
+              }
+              .direct-print-name {
+                font-size: 14px !important;
+                font-weight: 800 !important;
+                line-height: 1.25 !important;
+                margin-bottom: 6px !important;
+                color: #000 !important;
+                display: -webkit-box !important;
+                -webkit-line-clamp: 2 !important;
+                -webkit-box-orient: vertical !important;
+                overflow: hidden !important;
+              }
+              .direct-print-category {
+                font-size: 10px !important;
+                font-weight: 700 !important;
+                color: #555 !important;
+                margin-bottom: 4px !important;
+              }
+              .direct-print-meta {
+                font-size: 9px !important;
+                font-weight: 600 !important;
+                color: #666 !important;
+              }
+              .direct-print-footer {
+                margin-top: auto !important;
+                padding-top: 6px !important;
+                border-top: 1px dashed #ccc !important;
+              }
+              .direct-print-sn-label {
+                font-size: 8px !important;
+                font-weight: 700 !important;
+                color: #888 !important;
+                text-transform: uppercase !important;
+                display: block !important;
+                line-height: 1 !important;
+              }
+              .direct-print-sn-val {
+                font-family: monospace !important;
+                font-size: 11px !important;
+                font-weight: 700 !important;
+                color: #000 !important;
+                line-height: 1.2 !important;
+              }
+              .direct-print-qr-sec {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-left: 1.5px solid #eee !important;
+                padding-left: 16px !important;
+                height: 100% !important;
+                box-sizing: border-box !important;
+              }
+              .direct-print-qr-img {
+                width: 110px !important;
+                height: 110px !important;
+                display: block !important;
+              }
+              .direct-print-id-val {
+                font-family: monospace !important;
+                font-size: 12px !important;
+                font-weight: 900 !important;
+                color: #000 !important;
+                margin-top: 6px !important;
+                letter-spacing: 0.05em !important;
+              }
+              @page {
+                size: 3.5in 2.4in;
+                margin: 0;
+              }
+            }
+          `}</style>
+          <div className="direct-print-flex">
+            <div className="direct-print-info">
+              <div>
+                <div className="direct-print-header">🏢 IT ASSET SECURITY TAG</div>
+                <div className="direct-print-name">{asset.name}</div>
+                <div className="direct-print-category">หมวดหมู่: {asset.category}</div>
+                {(asset.responsiblePerson || asset.department) && (
+                  <div className="direct-print-meta">
+                    {asset.responsiblePerson ? `ผู้ดูแล: ${asset.responsiblePerson}` : ''}
+                    {asset.responsiblePerson && asset.department ? ' | ' : ''}
+                    {asset.department ? `แผนก: ${asset.department}` : ''}
+                  </div>
+                )}
+              </div>
+              <div className="direct-print-footer">
+                <span className="direct-print-sn-label">SERIAL NO.</span>
+                <span className="direct-print-sn-val">{asset.serialNumber || 'N/A'}</span>
+              </div>
+            </div>
+            <div className="direct-print-qr-sec">
+              {qrCodeUrl ? (
+                <img className="direct-print-qr-img" src={qrCodeUrl} alt="QR Code" />
+              ) : (
+                <div className="w-[110px] h-[110px] bg-slate-100 flex items-center justify-center text-[10px]">Generating QR...</div>
+              )}
+              <div className="direct-print-id-val">{asset.id}</div>
+            </div>
           </div>
         </div>
       )}

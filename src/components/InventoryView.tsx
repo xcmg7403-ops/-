@@ -1879,6 +1879,15 @@ export default function InventoryView({
           </div>
         </div>
       )}
+
+      {/* QR Code Scanner Modal */}
+      <QRScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        assets={assets}
+        onSelectAsset={onSelectAsset}
+        triggerToast={triggerToast}
+      />
     </div>
   );
 }
