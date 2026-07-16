@@ -65,14 +65,42 @@
 
 /* Sticker Label Printing Media Styles */
 @media print {
-  /* Hide the rest of the application layout */
-  body > div:not(.sticker-print-container),
-  body > svg,
-  #root > div:not(.sticker-print-container) {
+  /* Hide typical web page layout components */
+  aside,
+  header,
+  nav,
+  footer,
+  button,
+  .no-print,
+  .toast-container {
     display: none !important;
   }
-  
-  /* Make sure our print container is fully visible and occupies full space */
+
+  /* Make sure background colors and exact colors are printed */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all elements inside the app by default during printing, EXCEPT the printable areas */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Make sure the printable containers and all of their children are visible */
+  .sticker-print-container,
+  .sticker-print-container *,
+  #direct-printable-label,
+  #direct-printable-label *,
+  #sticker-print-area,
+  #sticker-print-area * {
+    visibility: visible !important;
+  }
+
+  /* Layout and style for the batch sticker print container */
   .sticker-print-container {
     display: block !important;
     position: absolute !important;
@@ -83,12 +111,7 @@
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
-    color: black !important;
     z-index: 9999999 !important;
-  }
-
-  .sticker-print-container * {
-    visibility: visible !important;
   }
 
   /* Break inside sticker cards forbidden to prevent half printed labels */
