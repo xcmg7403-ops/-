@@ -17,6 +17,7 @@ import {
   Download,
   ShoppingCart,
   User,
+  UserX,
   Mail,
   Phone,
   MapPin,
@@ -479,7 +480,7 @@ export default function AssetDetailsView({
   };
 
   // Form Fields State
-  const [activeTab, setActiveTab] = useState<'general' | 'purchase' | 'technical'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'purchase' | 'technical' | 'assignee'>('general');
   const [formName, setFormName] = useState(asset.name);
   const [formSerial, setFormSerial] = useState(asset.serialNumber);
   const [formCategory, setFormCategory] = useState<string>(asset.category);
@@ -514,6 +515,14 @@ export default function AssetDetailsView({
     return found ? found.details : '';
   });
 
+  const [formAssigneeName, setFormAssigneeName] = useState(asset.assignee?.name || '');
+  const [formAssigneeRole, setFormAssigneeRole] = useState(asset.assignee?.role || '');
+  const [formAssigneeDept, setFormAssigneeDept] = useState(asset.assignee?.department || '');
+  const [formAssigneeEmail, setFormAssigneeEmail] = useState(asset.assignee?.email || '');
+  const [formAssigneePhone, setFormAssigneePhone] = useState(asset.assignee?.phone || '');
+  const [formAssigneeLocation, setFormAssigneeLocation] = useState(asset.assignee?.location || '');
+  const [formAssigneeAvatar, setFormAssigneeAvatar] = useState(asset.assignee?.avatar || '');
+
   // Sync form states with asset prop changes
   useEffect(() => {
     setFormName(asset.name);
@@ -544,6 +553,14 @@ export default function AssetDetailsView({
     setFormDisplay(foundDisplay ? foundDisplay.details : '');
     const foundOSVersion = asset.detailedSpecs?.find(s => s.item.toLowerCase() === 'os version');
     setFormOSVersion(foundOSVersion ? foundOSVersion.details : '');
+
+    setFormAssigneeName(asset.assignee?.name || '');
+    setFormAssigneeRole(asset.assignee?.role || '');
+    setFormAssigneeDept(asset.assignee?.department || '');
+    setFormAssigneeEmail(asset.assignee?.email || '');
+    setFormAssigneePhone(asset.assignee?.phone || '');
+    setFormAssigneeLocation(asset.assignee?.location || '');
+    setFormAssigneeAvatar(asset.assignee?.avatar || '');
   }, [asset]);
 
   // Handle save of inline edits
@@ -577,6 +594,16 @@ export default function AssetDetailsView({
       currentSpecs.splice(osVerIndex, 1);
     }
 
+    const assigneeObj = formAssigneeName.trim() ? {
+      name: formAssigneeName.trim(),
+      role: formAssigneeRole.trim(),
+      department: formAssigneeDept.trim(),
+      email: formAssigneeEmail.trim(),
+      phone: formAssigneePhone.trim(),
+      location: formAssigneeLocation.trim(),
+      avatar: formAssigneeAvatar.trim() || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+    } : undefined;
+
     const updatedAsset: Asset = {
       ...asset,
       name: formName,
@@ -602,7 +629,8 @@ export default function AssetDetailsView({
       purchaseDate: formPurchaseDate || undefined,
       warrantyExpiryDate: formExpiryDate || undefined,
       imageUrl: formImageUrl || undefined,
-      detailedSpecs: currentSpecs.length > 0 ? currentSpecs : undefined
+      detailedSpecs: currentSpecs.length > 0 ? currentSpecs : undefined,
+      assignee: assigneeObj
     };
 
     onEditAsset(updatedAsset);
@@ -821,16 +849,34 @@ export default function AssetDetailsView({
           {/* Details Content */}
           <div className="flex-1 w-full flex flex-col justify-between h-full space-y-6">
             <div>
-              {/* Dynamic Status badge */}
-              <div className="inline-flex items-center gap-1.5 bg-[#00494212] text-[#004942] px-3.5 py-1 rounded-full mb-3 select-none">
-                <span className="w-2 h-2 rounded-full bg-[#004942]"></span>
-                <span className="text-[11px] font-bold">
-                  {asset.status === 'In Use'
-                    ? 'ใช้งานปกติ (Active)'
-                    : asset.status === 'Available'
-                    ? 'พร้อมเบิกใช้งาน (Available)'
-                    : 'อยู่ระหว่างซ่อมบำรุง (Repair)'}
-                </span>
+              {/* Dynamic Status and Assignee badges */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                <div className="inline-flex items-center gap-1.5 bg-[#00494212] text-[#004942] px-3.5 py-1 rounded-full select-none">
+                  <span className="w-2 h-2 rounded-full bg-[#004942]"></span>
+                  <span className="text-[11px] font-bold">
+                    {asset.status === 'In Use'
+                      ? 'ใช้งานปกติ (Active)'
+                      : asset.status === 'Available'
+                      ? 'พร้อมเบิกใช้งาน (Available)'
+                      : 'อยู่ระหว่างซ่อมบำรุง (Repair)'}
+                  </span>
+                </div>
+
+                {asset.assignee ? (
+                  <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 border border-blue-200 px-3.5 py-1 rounded-full select-none">
+                    <User className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-[11px] font-bold">
+                      ผู้รับผิดชอบ: {asset.assignee.name}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-800 border border-rose-200 px-3.5 py-1 rounded-full select-none font-bold">
+                    <UserX className="w-3.5 h-3.5 text-rose-500" />
+                    <span className="text-[11px] font-bold">
+                      Unassigned
+                    </span>
+                  </div>
+                )}
               </div>
 
               <h3 className="text-xl font-bold text-slate-800 font-sans tracking-tight mb-2">
@@ -1072,14 +1118,27 @@ export default function AssetDetailsView({
         </div>
 
         {/* Assigned User Details Card (Bento Area 4 - col-4) */}
-        <div className="col-span-12 md:col-span-6 lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between gap-4">
-          <h4 className="font-bold text-slate-800 font-sans text-sm flex items-center gap-2.5">
-            <User className="w-4.5 h-4.5 text-primary" />
-            <span>ผู้รับผิดชอบปัจจุบัน</span>
-          </h4>
+        <div className="col-span-12 md:col-span-6 lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-bold text-slate-800 font-sans text-sm flex items-center gap-2.5">
+              <User className="w-4.5 h-4.5 text-primary" />
+              <span>ผู้รับผิดชอบปัจจุบัน</span>
+            </h4>
+            {asset.assignee ? (
+              <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-[10px] font-bold px-2.5 py-1 rounded-full border border-blue-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                Assigned
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 text-[10px] font-bold px-2.5 py-1 rounded-full border border-rose-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                Unassigned
+              </span>
+            )}
+          </div>
           
           {asset.assignee ? (
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 flex flex-col justify-between">
               <div className="flex items-center gap-3.5 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <img
                   className="w-11 h-11 rounded-full object-cover shadow-sm border border-slate-200 shrink-0"
@@ -1088,11 +1147,14 @@ export default function AssetDetailsView({
                   referrerPolicy="no-referrer"
                 />
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-800 truncate leading-none mb-1.5">{asset.assignee.name}</p>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <User className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <p className="text-xs font-bold text-slate-800 truncate leading-none">{asset.assignee.name}</p>
+                  </div>
                   <p className="text-[10px] text-slate-400 font-medium truncate">{asset.assignee.role}, {asset.assignee.department}</p>
                 </div>
               </div>
-              <div className="space-y-2 text-xs text-slate-500 font-medium">
+              <div className="space-y-2 text-xs text-slate-500 font-medium bg-slate-50/50 p-3 rounded-xl border border-slate-100/60">
                 <div className="flex items-center gap-2">
                   <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span className="truncate">{asset.assignee.email}</span>
@@ -1108,14 +1170,22 @@ export default function AssetDetailsView({
               </div>
             </div>
           ) : (
-            <div className="py-6 flex flex-col items-center justify-center text-center gap-2 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200 flex-grow">
-              <User className="w-6 h-6 text-slate-300" />
-              <p className="text-xs font-medium">ไม่มีการมอบหมายผู้ใช้ครอง</p>
+            <div className="py-6 flex flex-col items-center justify-center text-center gap-2.5 text-slate-400 bg-rose-50/25 rounded-2xl border border-dashed border-rose-200/60 flex-grow">
+              <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center shadow-xs">
+                <UserX className="w-5 h-5 text-rose-500" />
+              </div>
+              <div>
+                <span className="inline-flex bg-rose-100 text-rose-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md mb-1 uppercase tracking-wide">
+                  Unassigned
+                </span>
+                <p className="text-xs font-semibold text-slate-600 mt-1">ไม่มีการมอบหมายผู้ใช้ครอง</p>
+                <p className="text-[10px] text-slate-400 max-w-[200px] mx-auto mt-0.5 leading-normal">ครุภัณฑ์นี้ว่างอยู่และพร้อมนำไปจัดสรรหรือส่งซ่อมบำรุง</p>
+              </div>
               <button
-                onClick={() => alert('จำลองการทำงาน: เลือกผู้รับผิดชอบและมอบหมายครุภัณฑ์')}
-                className="text-[11px] text-secondary font-bold hover:underline cursor-pointer"
+                onClick={() => setIsEditOpen(true)}
+                className="mt-1 text-xs text-[#00236f] hover:text-primary font-bold hover:underline cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200/80 shadow-sm"
               >
-                มอบหมายครุภัณฑ์เลย
+                + มอบหมายผู้รับผิดชอบหลัก
               </button>
             </div>
           )}
@@ -1217,6 +1287,17 @@ export default function AssetDetailsView({
                 }`}
               >
                 3. คุณสมบัติเทคนิค & เครือข่าย
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('assignee')}
+                className={`flex-1 py-2 px-3 text-center text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'assignee'
+                    ? 'bg-white text-primary shadow-sm border border-slate-200/50'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                }`}
+              >
+                4. ผู้รับผิดชอบปัจจุบัน
               </button>
             </div>
             
@@ -1524,6 +1605,93 @@ export default function AssetDetailsView({
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none"
                         placeholder="บันทึกรายละเอียดเพิ่มเติม..."
                       />
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'assignee' && (
+                  <div className="space-y-4 animate-in fade-in duration-150">
+                    <h4 className="text-xs font-bold text-primary border-b border-slate-100 pb-1">ข้อมูลผู้รับผิดชอบปัจจุบัน / ผู้ครอบครองเครื่อง (Assignee Details)</h4>
+                    <p className="text-[10px] text-slate-500 font-medium leading-normal bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50">
+                      ℹ️ กรอกข้อมูลเพื่อมอบหมายหรือเปลี่ยนผู้ถือครองของครุภัณฑ์ชิ้นนี้ หากต้องการนำผู้ใช้ครองออก (ตั้งเป็น Unassigned) ให้เว้นว่างที่ช่อง <strong>"ชื่อ-นามสกุล"</strong>
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">ชื่อ-นามสกุล ผู้ถือครอง</label>
+                        <input
+                          type="text"
+                          value={formAssigneeName}
+                          onChange={(e) => setFormAssigneeName(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                          placeholder="เช่น สิริวิมล วิเศษศิลป์"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">ตำแหน่งงาน (Role)</label>
+                        <input
+                          type="text"
+                          value={formAssigneeRole}
+                          onChange={(e) => setFormAssigneeRole(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                          placeholder="เช่น Graphic Designer"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">แผนก / ทีม (Department)</label>
+                        <input
+                          type="text"
+                          value={formAssigneeDept}
+                          onChange={(e) => setFormAssigneeDept(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                          placeholder="เช่น Creative Team"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">อีเมลผู้ถือครอง (Email)</label>
+                        <input
+                          type="email"
+                          value={formAssigneeEmail}
+                          onChange={(e) => setFormAssigneeEmail(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none font-mono"
+                          placeholder="เช่น siriwimon.v@company.com"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">เบอร์โทรศัพท์ / เบอร์ภายใน (Phone)</label>
+                        <input
+                          type="text"
+                          value={formAssigneePhone}
+                          onChange={(e) => setFormAssigneePhone(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                          placeholder="เช่น Ext. 402 หรือ 081-xxxxxxx"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">สถานที่ปฏิบัติงาน / โต๊ะทำงาน (Location)</label>
+                        <input
+                          type="text"
+                          value={formAssigneeLocation}
+                          onChange={(e) => setFormAssigneeLocation(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                          placeholder="เช่น ชั้น 4, ฝั่ง West Wing"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">ลิงก์รูปภาพโปรไฟล์ (Avatar URL)</label>
+                        <input
+                          type="text"
+                          value={formAssigneeAvatar}
+                          onChange={(e) => setFormAssigneeAvatar(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none font-mono"
+                          placeholder="https://example.com/avatar.png (เว้นว่างไว้เพื่อดึงรูปโปรไฟล์ดีฟอลต์)"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
