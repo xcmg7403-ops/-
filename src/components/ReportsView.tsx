@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Asset, RepairTicket } from '../types';
 import { jsPDF } from 'jspdf';
+import { formatCurrency } from '../lib/currency';
 import {
   BarChart3,
   Wallet,
@@ -25,13 +26,14 @@ import {
 interface ReportsViewProps {
   assets: Asset[];
   repairTickets: RepairTicket[];
+  currency?: string;
 }
 
-export default function ReportsView({ assets, repairTickets }: ReportsViewProps) {
+export default function ReportsView({ assets, repairTickets, currency = 'THB (฿) - Thai Baht' }: ReportsViewProps) {
   // Navigation tabs: 'assets' or 'maintenance'
   const [activeReportTab, setActiveReportTab] = useState<'assets' | 'maintenance'>('maintenance');
 
-  // Find the most recent ticket to determine the default year and month
+  // Find the most recent ticket to determine the default year and month, with fallback to the current real date
   const defaultYearMonth = useMemo(() => {
     if (repairTickets.length > 0) {
       const sorted = [...repairTickets].sort((a, b) => (b.dateSubmitted || '').localeCompare(a.dateSubmitted || ''));
@@ -44,7 +46,10 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
         };
       }
     }
-    return { year: '2024', month: '05' };
+    const today = new Date();
+    const currentYearStr = String(today.getFullYear());
+    const currentMonthStr = String(today.getMonth() + 1).padStart(2, '0');
+    return { year: currentYearStr, month: currentMonthStr };
   }, [repairTickets]);
 
   // Month-Year Selection State for Maintenance Report
@@ -61,6 +66,10 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
         setSelectedYear(yr);
         setSelectedMonth(mo);
       }
+    } else {
+      const today = new Date();
+      setSelectedYear(String(today.getFullYear()));
+      setSelectedMonth(String(today.getMonth() + 1).padStart(2, '0'));
     }
   }, [repairTickets]);
 
@@ -73,7 +82,12 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
         if (/^\d{4}$/.test(y)) years.add(y);
       }
     });
-    // Add current year and 2026 if not already present
+    
+    // Add current and surrounding years dynamically to always stay up-to-date
+    const currentYear = new Date().getFullYear();
+    years.add(String(currentYear));
+    years.add(String(currentYear - 1));
+    years.add(String(currentYear - 2));
     years.add('2024');
     years.add('2025');
     years.add('2026');
@@ -773,7 +787,7 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">มูลค่าครุภัณฑ์รวม</p>
-                <h4 className="text-xl font-bold text-slate-800 mt-0.5">฿{totalInvestment.toLocaleString()}</h4>
+                <h4 className="text-xl font-bold text-slate-800 mt-0.5">{formatCurrency(totalInvestment, currency)}</h4>
                 <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">รวมทุกหมวดหมู่สินค้า</p>
               </div>
             </div>
@@ -785,7 +799,7 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">มูลค่าเฉลี่ยต่อชิ้น</p>
-                <h4 className="text-xl font-bold text-slate-800 mt-0.5">฿{averagePrice.toLocaleString()}</h4>
+                <h4 className="text-xl font-bold text-slate-800 mt-0.5">{formatCurrency(averagePrice, currency)}</h4>
                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">คำนวณจากหน่วยระบบจริง</p>
               </div>
             </div>
@@ -835,7 +849,7 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
                     <div key={key} className="space-y-1.5">
                       <div className="flex justify-between text-xs">
                         <span className="font-semibold text-slate-700">{label}</span>
-                        <span className="font-mono text-slate-500">฿{value.toLocaleString()} ({percent}%)</span>
+                        <span className="font-mono text-slate-500">{formatCurrency(value, currency)} ({percent}%)</span>
                       </div>
                       <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                         <div
@@ -874,7 +888,7 @@ export default function ReportsView({ assets, repairTickets }: ReportsViewProps)
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs font-extrabold text-slate-800">฿{asset.purchasePrice.toLocaleString()}</p>
+                          <p className="text-xs font-extrabold text-slate-800">{formatCurrency(asset.purchasePrice, currency)}</p>
                           <span className="text-[9px] text-slate-400 font-semibold">Acquisition cost</span>
                         </div>
                       </div>

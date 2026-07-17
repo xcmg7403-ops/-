@@ -38,6 +38,7 @@ interface InventoryViewProps {
   onEditAsset: (asset: Asset) => void;
   onDeleteAsset: (id: string) => void;
   triggerToast: (type: 'success' | 'error' | 'info', message: string) => void;
+  onImportAssets?: (assets: Asset[]) => void;
 }
 
 export default function InventoryView({
@@ -46,7 +47,8 @@ export default function InventoryView({
   onAddAsset,
   onEditAsset,
   onDeleteAsset,
-  triggerToast
+  triggerToast,
+  onImportAssets
 }: InventoryViewProps) {
   // Filters & State
   const [selectedCategory, setSelectedCategory] = useState<string>('ทั้งหมด');
@@ -91,8 +93,12 @@ export default function InventoryView({
   const [formPrice, setFormPrice] = useState<number>(35000);
   const [formVendor, setFormVendor] = useState('');
   const [formPO, setFormPO] = useState('');
-  const [formPurchaseDate, setFormPurchaseDate] = useState('2024-01-15');
-  const [formExpiryDate, setFormExpiryDate] = useState('2027-01-15');
+  const [formPurchaseDate, setFormPurchaseDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [formExpiryDate, setFormExpiryDate] = useState(() => {
+    const threeYearsLater = new Date();
+    threeYearsLater.setFullYear(threeYearsLater.getFullYear() + 3);
+    return threeYearsLater.toISOString().split('T')[0];
+  });
   const [formCPU, setFormCPU] = useState('');
   const [formRAM, setFormRAM] = useState('');
   const [formStorage, setFormStorage] = useState('');
@@ -130,8 +136,10 @@ export default function InventoryView({
   // Open Add Modal
   const handleOpenAddModal = () => {
     setEditingAsset(null);
+    const currentYear = new Date().getFullYear();
+    const currentBE = currentYear + 543;
     // Auto-generate some sensible asset code
-    const generatedId = `IT-NB-2569-${String(Math.floor(Math.random() * 900) + 100)}`;
+    const generatedId = `IT-NB-${currentBE}-${String(Math.floor(Math.random() * 900) + 100)}`;
     setFormId(generatedId);
     setFormName('');
     setFormSerial('');
@@ -140,9 +148,12 @@ export default function InventoryView({
     setFormStatus('Available');
     setFormPrice(29000);
     setFormVendor('JIB Computer Group');
-    setFormPO('PO-2024/' + Math.floor(Math.random() * 300));
-    setFormPurchaseDate('2026-07-15');
-    setFormExpiryDate('');
+    setFormPO(`PO-${currentYear}/` + Math.floor(Math.random() * 300));
+    setFormPurchaseDate(new Date().toISOString().split('T')[0]);
+    
+    const threeYearsLater = new Date();
+    threeYearsLater.setFullYear(threeYearsLater.getFullYear() + 3);
+    setFormExpiryDate(threeYearsLater.toISOString().split('T')[0]);
     setFormCPU('');
     setFormRAM('');
     setFormStorage('');
@@ -335,6 +346,292 @@ export default function InventoryView({
     } catch (e) {
       triggerToast('error', 'เกิดข้อผิดพลาดในการสร้างไฟล์นำออกข้อมูล');
     }
+  };
+
+  // Download Import Template (CSV)
+  const handleDownloadTemplate = () => {
+    const headers = [
+      'Asset ID',
+      'Name',
+      'Serial Number',
+      'Category',
+      'Department',
+      'Status',
+      'Purchase Price',
+      'Warranty Expiry',
+      'Brand',
+      'Model',
+      'CPU',
+      'RAM',
+      'Storage',
+      'OS',
+      'Vendor',
+      'Purchase Order',
+      'Purchase Date',
+      'Division',
+      'Responsible Person',
+      'IP Address',
+      'Remarks'
+    ];
+    
+    const sampleRows = [
+      [
+        'IT-NB-2569-001',
+        'Dell Latitude 5440 Laptop',
+        'S/N-DELL-5440-ABC',
+        'Notebook',
+        'IT Operations',
+        'Available',
+        '35000',
+        '2028-07-16',
+        'Dell',
+        'Latitude 5440',
+        'Intel Core i5',
+        '16GB DDR5',
+        '512GB SSD NVMe',
+        'Windows 11 Pro',
+        'Dell Thailand',
+        'PO-2026-0001',
+        '2026-07-16',
+        'Infrastructure Division',
+        'Somsak Jaidee',
+        '192.168.1.55',
+        'Premium quality notebook for general office use'
+      ],
+      [
+        'IT-PC-2569-002',
+        'HP Pro Tower 400 G9 PC',
+        'S/N-HP-PRO-XYZ',
+        'PC',
+        'Finance & Accounting',
+        'In Use',
+        '24500',
+        '2029-01-10',
+        'HP',
+        'Pro Tower 400',
+        'Intel Core i7',
+        '8GB DDR4',
+        '256GB SSD',
+        'Windows 11 Home',
+        'HP Direct',
+        'PO-2026-0002',
+        '2026-07-17',
+        'Accounting Team',
+        'Wipa Thaimit',
+        '192.168.1.102',
+        'Standard workstation with low power usage'
+      ]
+    ];
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' 
+      + [headers.join(','), ...sampleRows.map(e => e.join(',')).map(line => line.replace(/\n/g, ' '))].join('\n');
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', 'AssetManager_Template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    triggerToast('success', 'ดาวน์โหลดเทมเพลตนำเข้าครุภัณฑ์ (CSV Template) สำเร็จแล้ว');
+  };
+
+  // Import durable goods registry list from CSV
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        if (!text) {
+          triggerToast('error', 'ไฟล์เปล่าหรือรูปแบบข้อมูลไม่ถูกต้อง');
+          return;
+        }
+
+        // Dynamically detect CSV delimiter (comma vs semicolon vs tab)
+        let delimiter = ',';
+        const firstLine = text.split(/\r?\n/)[0] || '';
+        const commaCount = (firstLine.match(/,/g) || []).length;
+        const semiCount = (firstLine.match(/;/g) || []).length;
+        const tabCount = (firstLine.match(/\t/g) || []).length;
+        if (semiCount > commaCount && semiCount > tabCount) {
+          delimiter = ';';
+        } else if (tabCount > commaCount && tabCount > semiCount) {
+          delimiter = '\t';
+        }
+
+        const lines: string[][] = [];
+        let row: string[] = [];
+        let inQuotes = false;
+        let currentValue = '';
+
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          const nextChar = text[i + 1];
+
+          if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+              currentValue += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === delimiter && !inQuotes) {
+            row.push(currentValue.trim());
+            currentValue = '';
+          } else if ((char === '\r' || char === '\n') && !inQuotes) {
+            if (char === '\r' && nextChar === '\n') {
+              i++;
+            }
+            row.push(currentValue.trim());
+            if (row.length > 0 && row.some(cell => cell !== '')) {
+              lines.push(row);
+            }
+            row = [];
+            currentValue = '';
+          } else {
+            currentValue += char;
+          }
+        }
+        if (currentValue || row.length > 0) {
+          row.push(currentValue.trim());
+          if (row.some(cell => cell !== '')) {
+            lines.push(row);
+          }
+        }
+
+        if (lines.length < 2) {
+          triggerToast('error', 'ไม่พบข้อมูลครุภัณฑ์สำหรับการนำเข้า (ต้องมีแถวหัวตารางและแถวข้อมูล)');
+          return;
+        }
+
+        // Normalize column headers to allow extremely fuzzy matching
+        const normalizeHeader = (str: string) => {
+          return str.toLowerCase().trim().replace(/["']/g, '').replace(/[\s_-]+/g, '');
+        };
+
+        const headers = lines[0].map(h => normalizeHeader(h));
+        const dataRows = lines.slice(1);
+
+        const parsedAssets: Asset[] = [];
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const cells of dataRows) {
+          if (cells.length < 1) continue;
+
+          const getValueByHeader = (possibleNames: string[]) => {
+            const normalizedNames = possibleNames.map(p => normalizeHeader(p));
+            const index = headers.findIndex(h => normalizedNames.includes(h));
+            return index !== -1 ? cells[index] || '' : '';
+          };
+
+          let id = getValueByHeader(['asset id', 'id', 'รหัสครุภัณฑ์', 'รหัส', 'เลขครุภัณฑ์', 'รหัสสินค้า', 'assetid', 'asset_id', 'รหัสสินทรัพย์', 'หมายเลขครุภัณฑ์']).replace(/["']/g, '').trim();
+          const name = getValueByHeader(['name', 'ชื่อครุภัณฑ์', 'ชื่อ', 'item name', 'item', 'ชื่อรายการ', 'asset name', 'assetname', 'asset_name', 'ชื่อสินทรัพย์']).replace(/["']/g, '').trim();
+          
+          if (!name) {
+            errorCount++;
+            continue;
+          }
+
+          if (!id) {
+            // Auto-generate a unique asset ID if missing but name exists
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const randSuffix = Math.floor(1000 + Math.random() * 9000);
+            id = `IT-GEN-${dateStr}-${randSuffix}`;
+          }
+
+          const serialNumber = getValueByHeader(['serial number', 'serial', 's/n', 'ซีเรียล', 'หมายเลขเครื่อง', 'เลขซีเรียล', 'serialnumber', 'serial_number', 'หมายเลขซีเรียล', 'เลขที่ซีเรียล']).replace(/["']/g, '').trim() || 'S/N-UNKNOWN';
+          const categoryRaw = getValueByHeader(['category', 'หมวดหมู่', 'ประเภท', 'หมวดหมู่ครุภัณฑ์', 'ชนิด', 'ประเภทครุภัณฑ์']).replace(/["']/g, '').trim();
+          const department = getValueByHeader(['department', 'แผนก', 'สังกัด', 'หน่วยงาน', 'ฝ่าย', 'กอง']).replace(/["']/g, '').trim() || 'General Operations';
+          const statusRaw = getValueByHeader(['status', 'สถานะ', 'สถานะการใช้งาน']).replace(/["']/g, '').trim();
+          const priceRaw = getValueByHeader(['purchase price', 'price', 'ราคา', 'ราคาซื้อ', 'ราคาทุน', 'มูลค่า', 'purchaseprice', 'purchase_price', 'ราคาจัดซื้อ']).replace(/["']/g, '').trim();
+          const warrantyExpiryDate = getValueByHeader(['warranty expiry', 'expiry', 'วันหมดประกัน', 'วันสิ้นสุดประกัน', 'หมดประกัน', 'warrantyexpiry', 'warranty_expiry', 'วันที่หมดประกัน']).replace(/["']/g, '').trim() || 'Expired';
+
+          const brand = getValueByHeader(['brand', 'ยี่ห้อ', 'แบรนด์']).replace(/["']/g, '').trim();
+          const model = getValueByHeader(['model', 'รุ่น', 'โมเดล']).replace(/["']/g, '').trim();
+          const specCPU = getValueByHeader(['cpu', 'หน่วยประมวลผล', 'spec cpu', 'ซีพียู', 'สเปค cpu']).replace(/["']/g, '').trim();
+          const specRAM = getValueByHeader(['ram', 'หน่วยความจำ', 'spec ram', 'แรม', 'ขนาดแรม', 'สเปค ram']).replace(/["']/g, '').trim();
+          const specStorage = getValueByHeader(['storage', 'ฮาร์ดดิสก์', 'spec storage', 'ความจุ', 'ความจุฮาร์ดดิสก์', 'สเปค storage']).replace(/["']/g, '').trim();
+          const specOS = getValueByHeader(['os', 'ระบบปฏิบัติการ', 'spec os', 'ระบบปฏิบัติการ (os)', 'โอเอส', 'สเปค os']).replace(/["']/g, '').trim();
+          
+          const vendor = getValueByHeader(['vendor', 'ผู้จัดจำหน่าย', 'ร้านค้า', 'ผู้ขาย', 'บริษัทคู่ค้า']).replace(/["']/g, '').trim();
+          const purchaseOrder = getValueByHeader(['purchase order', 'po', 'ใบสั่งซื้อ', 'เลขที่ใบสั่งซื้อ', 'purchaseorder', 'purchase_order', 'ใบจัดซื้อ']).replace(/["']/g, '').trim();
+          const purchaseDate = getValueByHeader(['purchase date', 'วันที่ซื้อ', 'วันจัดซื้อ', 'purchasedate', 'purchase_date', 'วันที่จัดซื้อ']).replace(/["']/g, '').trim() || new Date().toISOString().split('T')[0];
+          const division = getValueByHeader(['division', 'ทีม', 'ฝ่าย', 'กอง', 'ส่วนงาน']).replace(/["']/g, '').trim();
+          const responsiblePerson = getValueByHeader(['responsible person', 'ผู้ดูแล', 'ผู้รับผิดชอบ', 'ผู้ใช้งาน', 'responsibleperson', 'responsible_person', 'ชื่อผู้ใช้งาน']).replace(/["']/g, '').trim();
+          const ipAddress = getValueByHeader(['ip address', 'ip', 'ไอพี', 'เลขไอพี', 'ipaddress', 'ip_address', 'ที่อยู่ ip']).replace(/["']/g, '').trim();
+          const remarks = getValueByHeader(['remarks', 'หมายเหตุ']).replace(/["']/g, '').trim();
+
+          let category: AssetCategory = 'Notebook';
+          const catLower = categoryRaw.toLowerCase().trim();
+          if (catLower.includes('pc') || catLower.includes('desktop') || catLower.includes('พีซี') || catLower.includes('ตั้งโต๊ะ')) category = 'PC';
+          else if (catLower.includes('notebook') || catLower.includes('laptop') || catLower.includes('โน้ตบุ๊ก') || catLower.includes('แล็ปท็อป') || catLower.includes('โน๊ตบุ๊ค')) category = 'Notebook';
+          else if (catLower.includes('furniture') || catLower.includes('โต๊ะ') || catLower.includes('เก้าอี้') || catLower.includes('เฟอร์นิเจอร์')) category = 'Office Furniture';
+          else if (catLower.includes('appliance') || catLower.includes('electrical') || catLower.includes('เครื่องใช้ไฟฟ้า') || catLower.includes('แอร์') || catLower.includes('พัดลม')) category = 'Electrical Appliances';
+          else if (catLower.includes('vehicle') || catLower.includes('รถ') || catLower.includes('ยานพาหนะ')) category = 'Vehicles';
+          else if (catLower.includes('peripheral') || catLower.includes('accessory') || catLower.includes('เมาส์') || catLower.includes('คีย์บอร์ด') || catLower.includes('อุปกรณ์ต่อพ่วง')) category = 'Peripherals';
+          else if (catLower.includes('network') || catLower.includes('switch') || catLower.includes('router') || catLower.includes('เน็ตเวิร์ก') || catLower.includes('เราเตอร์')) category = 'Network';
+          else if (catLower.includes('server') || catLower.includes('เซิร์ฟเวอร์')) category = 'Server';
+          else if (catLower.includes('display') || catLower.includes('monitor') || catLower.includes('จอ') || catLower.includes('หน้าจอ')) category = 'Display';
+
+          let status: AssetStatus = 'Available';
+          const statLower = statusRaw.toLowerCase().trim();
+          if (statLower.includes('in use') || statLower.includes('active') || statLower.includes('ใช้งาน') || statLower.includes('กำลังใช้งาน')) status = 'In Use';
+          else if (statLower.includes('repair') || statLower.includes('ซ่อม') || statLower.includes('ชำรุด') || statLower.includes('ส่งซ่อม')) status = 'Repair';
+          else if (statLower.includes('available') || statLower.includes('ว่าง') || statLower.includes('พร้อมใช้') || statLower.includes('พร้อมใช้งาน')) status = 'Available';
+
+          const purchasePrice = parseFloat(priceRaw) || 0;
+
+          const newAsset: Asset = {
+            id,
+            name,
+            serialNumber,
+            category,
+            department,
+            status,
+            purchasePrice,
+            vendor,
+            purchaseOrder,
+            purchaseDate,
+            warrantyExpiryDate,
+            specCPU,
+            specRAM,
+            specStorage,
+            specOS,
+            brand,
+            model,
+            division,
+            responsiblePerson,
+            ipAddress,
+            remarks
+          };
+
+          parsedAssets.push(newAsset);
+          successCount++;
+        }
+
+        if (parsedAssets.length === 0) {
+          triggerToast('error', 'ไม่พบคอลัมน์ที่จำเป็น หรือไม่มีข้อมูลครุภัณฑ์ที่สามารถนำเข้าได้');
+          return;
+        }
+
+        if (onImportAssets) {
+          onImportAssets(parsedAssets);
+        } else {
+          parsedAssets.forEach(onAddAsset);
+        }
+
+        triggerToast('success', `นำเข้าครุภัณฑ์เสร็จสิ้นจำนวน ${successCount} รายการสำเร็จ! ${errorCount > 0 ? `(เกิดข้อผิดพลาดในการนำเข้า ${errorCount} แถวเนื่องจากขาดรหัสหรือชื่อครุภัณฑ์)` : ''}`);
+      } catch (err) {
+        console.error('Import CSV error:', err);
+        triggerToast('error', 'เกิดข้อผิดพลาดในการประมวลผลไฟล์ นำเข้าไม่สำเร็จ');
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    event.target.value = '';
   };
 
   // Open sticker print setup modal and generate QR Codes for selection
@@ -547,10 +844,31 @@ export default function InventoryView({
         </div>
         <div className="flex flex-wrap gap-2.5">
           <button
-            onClick={handleExportToExcel}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            title="ดาวน์โหลดไฟล์เทมเพลตมาตรฐานสำหรับกรอกข้อมูลนำเข้าครุภัณฑ์"
+          >
+            <Download className="w-4 h-4 text-primary" />
+            <span>Download Template</span>
+          </button>
+          <label
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            title="อัปโหลดไฟล์ครุภัณฑ์แบบ CSV เพื่อนำเข้าข้อมูลสู่ระบบ"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Import CSV</span>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+            />
+          </label>
+          <button
+            onClick={handleExportToExcel}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-blue-600" />
             <span>Export to Excel (CSV)</span>
           </button>
           <button

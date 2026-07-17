@@ -200,6 +200,25 @@ export const SEED_ASSETS: Asset[] = [
   }
 ];
 
+// Helper to calculate dynamic dates representing the current year and month
+const now = new Date();
+const curYear = now.getFullYear();
+const curMonth = now.getMonth(); // 0-11
+
+const formatMonthThai = (mIndex: number) => {
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  return months[mIndex % 12];
+};
+
+const currentYearStr = String(curYear);
+const currentMonthStr = String(curMonth + 1).padStart(2, '0');
+
+// Next month
+const nextMonthIndex = (curMonth + 1) % 12;
+const nextMonthYear = curMonth === 11 ? curYear + 1 : curYear;
+const nextMonthStr = String(nextMonthIndex + 1).padStart(2, '0');
+const nextMonthYearStr = String(nextMonthYear);
+
 export const SEED_REPAIR_TICKETS: RepairTicket[] = [
   {
     id: 'REP-2023-0812',
@@ -209,7 +228,7 @@ export const SEED_REPAIR_TICKETS: RepairTicket[] = [
     issue: 'หน้าจอกะพริบเป็นช่วงๆ (Flickering Screen)',
     status: 'Pending',
     priority: 'Medium',
-    dateSubmitted: '2024-05-20',
+    dateSubmitted: `${currentYearStr}-${currentMonthStr}-20`,
     technicianName: 'นายสมบูรณ์',
     repairType: 'Hardware'
   },
@@ -221,7 +240,7 @@ export const SEED_REPAIR_TICKETS: RepairTicket[] = [
     issue: 'หมึกพิมพ์เลอะขอบกระดาษเป็นรอยดำสม่ำเสมอ',
     status: 'Repairing',
     priority: 'Low',
-    dateSubmitted: '2024-05-18',
+    dateSubmitted: `${currentYearStr}-${currentMonthStr}-18`,
     technicianName: 'นายสมเกียรติ',
     repairType: 'Peripherals'
   },
@@ -233,7 +252,7 @@ export const SEED_REPAIR_TICKETS: RepairTicket[] = [
     issue: 'การเชื่อมต่อหลุดบ่อย คลื่นสัญญาณตกฮวบช่วงบ่าย',
     status: 'Completed',
     priority: 'Critical',
-    dateSubmitted: '2024-05-12',
+    dateSubmitted: `${currentYearStr}-${currentMonthStr}-12`,
     technicianName: 'นายวสันต์',
     repairType: 'Network'
   }
@@ -244,33 +263,33 @@ export const SEED_MAINTENANCE_EVENTS: MaintenanceEvent[] = [
     id: 'EV-001',
     title: 'ตรวจสอบระบบเซิร์ฟเวอร์หลัก',
     subtitle: 'ประจำไตรมาสที่ 3',
-    month: 'ส.ค.',
+    month: formatMonthThai(curMonth),
     day: '24',
     time: '09:00 - 12:00',
     location: 'Data Center Main Room',
     isActive: true,
-    fullDate: '2026-08-24'
+    fullDate: `${currentYearStr}-${currentMonthStr}-24`
   },
   {
     id: 'EV-002',
     title: 'ล้างเครื่องปรับอากาศห้อง Data Center',
     subtitle: 'บริษัท แอร์คลีน เซอร์วิส',
-    month: 'ส.ค.',
+    month: formatMonthThai(curMonth),
     day: '28',
     time: '13:00 - 15:30',
     location: 'Server Room A & B',
     isActive: false,
-    fullDate: '2026-08-28'
+    fullDate: `${currentYearStr}-${currentMonthStr}-28`
   },
   {
     id: 'EV-003',
     title: 'อัพเดท Firmware อุปกรณ์ Network',
     subtitle: 'ตึกสำนักงานใหญ่ ชั้น 4-10',
-    month: 'ก.ย.',
+    month: formatMonthThai(nextMonthIndex),
     day: '02',
     time: '22:00 - 02:00',
     location: 'Switching Closets (All floors)',
     isActive: false,
-    fullDate: '2026-09-02'
+    fullDate: `${nextMonthYearStr}-${nextMonthStr}-02`
   }
 ];

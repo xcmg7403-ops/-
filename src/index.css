@@ -121,3 +121,158 @@
   }
 }
 
+/* ==========================================
+   Dark Mode Premium Visual Theme Styles
+   ========================================== */
+.dark {
+  color-scheme: dark;
+}
+
+.dark,
+.dark body,
+.dark .bg-slate-50,
+.dark .bg-slate-50\/40,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/60,
+.dark .bg-slate-50\/70,
+.dark .bg-slate-50\/80,
+.dark .bg-slate-100,
+.dark .bg-slate-100\/80,
+.dark .bg-\[\#f8f9ff\] {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+.dark .bg-white,
+.dark .bg-white\/80 {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+/* Card titles and headings */
+.dark .text-slate-800,
+.dark .text-slate-900,
+.dark .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+/* Secondary/Description Texts */
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+
+/* Muted / Caption Texts */
+.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Borders across elements */
+.dark .border-slate-200,
+.dark .border-slate-100,
+.dark .border-slate-200\/80,
+.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+/* Form Inputs, Selects, Textareas */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #38bdf8 !important;
+  outline: none;
+  box-ring: 0 0 0 2px rgba(56, 189, 248, 0.15) !important;
+}
+
+.dark input::placeholder {
+  color: #475569 !important;
+}
+
+/* Hover effects */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-slate-50\/40:hover,
+.dark .hover\:bg-slate-50\/80:hover,
+.dark .hover\:bg-slate-100\/80:hover {
+  background-color: #334155 !important;
+}
+
+/* Primary Colors and Brand Accents */
+.dark .bg-primary {
+  background-color: #1e40af !important;
+}
+.dark .hover\:bg-primary-container:hover {
+  background-color: #1d4ed8 !important;
+}
+.dark .text-primary {
+  color: #60a5fa !important;
+}
+.dark .bg-\[\#00236f\] {
+  background-color: #1e3a8a !important;
+}
+
+/* Custom UI Alert/Status Overrides */
+.dark .bg-blue-50 {
+  background-color: rgba(56, 189, 248, 0.15) !important;
+  color: #38bdf8 !important;
+}
+.dark .text-secondary {
+  color: #38bdf8 !important;
+}
+.dark .border-secondary {
+  border-color: #38bdf8 !important;
+}
+.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+}
+.dark .text-emerald-600,
+.dark .text-emerald-700 {
+  color: #34d399 !important;
+}
+.dark .bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  color: #fb7185 !important;
+}
+.dark .text-rose-600,
+.dark .text-rose-700 {
+  color: #fb7185 !important;
+}
+.dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+}
+.dark .text-amber-700 {
+  color: #fbbf24 !important;
+}
+
+/* Premium Shadows in Dark Mode */
+.dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5) !important;
+}
+.dark .shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5) !important;
+}
+.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5) !important;
+}
+.dark .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Scrollbar customization in dark mode */
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+

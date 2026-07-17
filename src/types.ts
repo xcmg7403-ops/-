@@ -95,3 +95,13 @@ export interface UserRecord {
   department: string;
   status: 'Active' | 'Suspended';
 }
+
+export interface BackupRecord {
+  id: string;
+  timestamp: string;
+  schedule: string;
+  assets: Asset[];
+  repairTickets: RepairTicket[];
+  maintenanceEvents: MaintenanceEvent[];
+}
+

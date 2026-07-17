@@ -13,7 +13,7 @@ import LoginPage from './components/LoginPage';
 import AdminPortalView from './components/AdminPortalView';
 
 import { SEED_ASSETS, SEED_REPAIR_TICKETS, SEED_MAINTENANCE_EVENTS } from './mockData';
-import { Asset, RepairTicket, MaintenanceEvent, UserSession } from './types';
+import { Asset, RepairTicket, MaintenanceEvent, UserSession, BackupRecord } from './types';
 import { 
   getAssets, 
   saveAsset, 
@@ -23,7 +23,11 @@ import {
   deleteRepairTicket, 
   getMaintenanceEvents, 
   saveMaintenanceEvent, 
-  deleteMaintenanceEvent 
+  deleteMaintenanceEvent,
+  getBackups,
+  saveBackup,
+  deleteBackup,
+  clearDatabase
 } from './lib/firebase';
 
 export default function App() {
@@ -50,19 +54,56 @@ export default function App() {
   });
 
   const [isLoadingFirebase, setIsLoadingFirebase] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>(() => {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dateString = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `${dateString} เวลา ${timeString}`;
+  });
+
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      const [fbAssets, fbTickets, fbEvents] = await Promise.all([
+        getAssets(),
+        getRepairTickets(),
+        getMaintenanceEvents()
+      ]);
+      setAssets(fbAssets);
+      setRepairTickets(fbTickets);
+      setMaintenanceEvents(fbEvents);
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateString = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+      setLastUpdated(`${dateString} เวลา ${timeString}`);
+      triggerToast('success', 'อัปเดตข้อมูลและสถิติล่าสุดจากคลาวด์เรียบร้อยแล้ว');
+    } catch (e) {
+      console.error("Failed to refresh data from Firebase:", e);
+      triggerToast('error', 'ไม่สามารถดึงข้อมูลจากระบบคลาวด์ได้ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Load from Firebase on Mount
   useEffect(() => {
     async function loadFirebaseData() {
       try {
-        const [fbAssets, fbTickets, fbEvents] = await Promise.all([
+        const [fbAssets, fbTickets, fbEvents, fbBackups] = await Promise.all([
           getAssets(),
           getRepairTickets(),
-          getMaintenanceEvents()
+          getMaintenanceEvents(),
+          getBackups()
         ]);
         setAssets(fbAssets);
         setRepairTickets(fbTickets);
         setMaintenanceEvents(fbEvents);
+        setBackups(fbBackups);
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateString = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        setLastUpdated(`${dateString} เวลา ${timeString}`);
       } catch (e) {
         console.error("Failed to load data from Firebase:", e);
       } finally {
@@ -74,6 +115,77 @@ export default function App() {
 
   // Mobile sidebar open state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Theme state ('light' or 'dark')
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('assetmanager_theme') as 'light' | 'dark') || 'light';
+  });
+
+  // Currency State
+  const [currency, setCurrency] = useState<string>(() => {
+    return localStorage.getItem('assetmanager_currency') || 'THB (฿) - Thai Baht';
+  });
+
+  // Backup Schedule State
+  const [backupSchedule, setBackupSchedule] = useState<string>(() => {
+    return localStorage.getItem('assetmanager_backup_schedule') || 'Daily';
+  });
+
+  // Backups state
+  const [backups, setBackups] = useState<BackupRecord[]>([]);
+  const [isBackingUp, setIsBackingUp] = useState<boolean>(false);
+
+  // Auto Backup Effect
+  useEffect(() => {
+    if (isLoadingFirebase || backupSchedule === 'Off' || assets.length === 0) return;
+
+    const performAutoBackup = async () => {
+      const lastBackupStr = localStorage.getItem('assetmanager_last_backup') || '0';
+      const lastBackup = parseInt(lastBackupStr, 10);
+      const now = Date.now();
+      
+      let interval = 24 * 3600 * 1000; // Daily default
+      if (backupSchedule === 'Weekly') interval = 7 * 24 * 3600 * 1000;
+      if (backupSchedule === 'Monthly') interval = 30 * 24 * 3600 * 1000;
+
+      if (now - lastBackup >= interval) {
+        setIsBackingUp(true);
+        const backupId = `AUTO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const newBackup: BackupRecord = {
+          id: backupId,
+          timestamp: new Date().toISOString(),
+          schedule: backupSchedule,
+          assets,
+          repairTickets,
+          maintenanceEvents
+        };
+
+        try {
+          await saveBackup(newBackup);
+          localStorage.setItem('assetmanager_last_backup', String(now));
+          setBackups(prev => [newBackup, ...prev]);
+          triggerToast('info', `[Auto Backup] สำรองข้อมูลครุภัณฑ์สำเร็จ (${backupId})`);
+        } catch (e) {
+          console.error("Auto backup failed:", e);
+        } finally {
+          setIsBackingUp(false);
+        }
+      }
+    };
+
+    performAutoBackup();
+  }, [isLoadingFirebase, backupSchedule, assets, repairTickets, maintenanceEvents]);
+
+  // Apply theme class to document element and save to localStorage
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('assetmanager_theme', theme);
+  }, [theme]);
 
   // Navigation and Selection States
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -154,6 +266,89 @@ export default function App() {
     if (selectedAssetId === id) {
       setSelectedAssetId(null);
       setActiveTab('inventory');
+    }
+  };
+
+  // Import Assets Bulk Core Action
+  const handleImportAssets = async (importedAssets: Asset[]) => {
+    setAssets((prev) => {
+      const importedIds = new Set(importedAssets.map(a => a.id));
+      const filteredPrev = prev.filter(a => !importedIds.has(a.id));
+      return [...importedAssets, ...filteredPrev];
+    });
+
+    try {
+      await Promise.all(importedAssets.map(asset => saveAsset(asset)));
+    } catch (e) {
+      console.error("Failed to save imported assets:", e);
+      triggerToast('error', 'บันทึกข้อมูลนำเข้าลงคลาวด์ล้มเหลวบางรายการ');
+    }
+  };
+
+  // Manual Backup Core Action
+  const handleManualBackup = async () => {
+    setIsBackingUp(true);
+    const backupId = `MANUAL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newBackup: BackupRecord = {
+      id: backupId,
+      timestamp: new Date().toISOString(),
+      schedule: 'Manual',
+      assets,
+      repairTickets,
+      maintenanceEvents
+    };
+
+    try {
+      await saveBackup(newBackup);
+      localStorage.setItem('assetmanager_last_backup', String(Date.now()));
+      setBackups(prev => [newBackup, ...prev]);
+      triggerToast('success', `สำรองฐานข้อมูลเสร็จสมบูรณ์ รหัสสำรอง: ${backupId}`);
+    } catch (e) {
+      console.error("Manual backup failed:", e);
+      triggerToast('error', 'การสำรองข้อมูลล้มเหลว');
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  // Restore Backup Core Action
+  const handleRestoreBackup = async (backup: BackupRecord) => {
+    setIsRefreshing(true);
+    triggerToast('info', 'กำลังกู้คืนฐานข้อมูล ICT คลาวด์และหน่วยความจำ...');
+    try {
+      // 1. Wipe database first
+      await clearDatabase();
+      
+      // 2. Re-save all items from backup to Firestore in parallel
+      await Promise.all([
+        ...backup.assets.map(a => saveAsset(a)),
+        ...backup.repairTickets.map(t => saveRepairTicket(t)),
+        ...backup.maintenanceEvents.map(e => saveMaintenanceEvent(e))
+      ]);
+
+      // 3. Update memory state
+      setAssets(backup.assets);
+      setRepairTickets(backup.repairTickets);
+      setMaintenanceEvents(backup.maintenanceEvents);
+      
+      triggerToast('success', `กู้คืนฐานข้อมูลครุภัณฑ์จากชุดข้อมูลสำรอง (${backup.id}) เสร็จสมบูรณ์แล้ว ระบบทำการซิงก์เรียบร้อย`);
+    } catch (e) {
+      console.error("Failed to restore backup:", e);
+      triggerToast('error', 'การกู้คืนระบบล้มเหลว กรุณาติดต่อ ICT Administrator');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Delete Backup Core Action
+  const handleDeleteBackup = async (backupId: string) => {
+    try {
+      await deleteBackup(backupId);
+      setBackups(prev => prev.filter(b => b.id !== backupId));
+      triggerToast('success', 'ลบไฟล์สำรองข้อมูลออกจากระบบคลาวด์แล้ว');
+    } catch (e) {
+      console.error("Failed to delete backup:", e);
+      triggerToast('error', 'ไม่สามารถลบไฟล์สำรองข้อมูลได้');
     }
   };
 
@@ -292,6 +487,9 @@ export default function App() {
               assets={assets}
               onTabChange={handleTabChange}
               onSelectAsset={handleSelectAsset}
+              lastUpdated={lastUpdated}
+              onRefresh={handleRefreshData}
+              isRefreshing={isRefreshing}
               onOpenAddModal={() => {
                 setActiveTab('inventory');
                 triggerToast('info', 'กรุณากดปุ่ม "Add New Asset" เพื่อเริ่มบันทึก');
@@ -307,6 +505,7 @@ export default function App() {
               onEditAsset={handleEditAsset}
               onDeleteAsset={handleDeleteAsset}
               triggerToast={triggerToast}
+              onImportAssets={handleImportAssets}
             />
           )}
 
@@ -335,6 +534,7 @@ export default function App() {
                     onEditAsset={handleEditAsset}
                     onTriggerLogRepair={handleTriggerLogRepair}
                     triggerToast={triggerToast}
+                    currency={currency}
                   />
                 );
               } else {
@@ -353,13 +553,29 @@ export default function App() {
             })()
           )}
 
-          {activeTab === 'reports' && <ReportsView assets={assets} repairTickets={repairTickets} />}
+          {activeTab === 'reports' && <ReportsView assets={assets} repairTickets={repairTickets} currency={currency} />}
 
           {activeTab === 'admin' && user.role === 'admin' && (
             <AdminPortalView assets={assets} triggerToast={triggerToast} />
           )}
 
-          {activeTab === 'settings' && <SettingsView triggerToast={triggerToast} totalAssets={assets.length} />}
+          {activeTab === 'settings' && (
+            <SettingsView 
+              triggerToast={triggerToast} 
+              totalAssets={assets.length} 
+              theme={theme}
+              onThemeChange={setTheme}
+              currency={currency}
+              onCurrencyChange={setCurrency}
+              backupSchedule={backupSchedule}
+              onBackupScheduleChange={setBackupSchedule}
+              backups={backups}
+              isBackingUp={isBackingUp}
+              onTriggerManualBackup={handleManualBackup}
+              onRestoreBackup={handleRestoreBackup}
+              onDeleteBackup={handleDeleteBackup}
+            />
+          )}
         </main>
       </div>
     </div>

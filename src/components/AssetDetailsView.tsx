@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import { Asset, AssetStatus } from '../types';
+import { formatCurrency } from '../lib/currency';
 import {
   ChevronRight,
   Printer,
@@ -41,6 +42,7 @@ interface AssetDetailsViewProps {
   onEditAsset: (asset: Asset) => void;
   onTriggerLogRepair: (assetId: string) => void;
   triggerToast: (type: 'success' | 'error' | 'info', message: string) => void;
+  currency?: string;
 }
 
 export default function AssetDetailsView({
@@ -48,7 +50,8 @@ export default function AssetDetailsView({
   onBackToInventory,
   onEditAsset,
   onTriggerLogRepair,
-  triggerToast
+  triggerToast,
+  currency = 'THB (฿) - Thai Baht'
 }: AssetDetailsViewProps) {
   // Modal State for quick inline edit
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -186,6 +189,8 @@ export default function AssetDetailsView({
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
 
+      const orgName = localStorage.getItem('assetmanager_org_name') || 'AssetManager IT';
+
       // 1. Background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 1200, 1700);
@@ -196,13 +201,13 @@ export default function AssetDetailsView({
 
       // Title Text
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 30px sans-serif';
-      ctx.fillText('IT ASSET COMPLIANCE AUDIT REPORT', 80, 70);
+      ctx.font = 'bold 26px sans-serif';
+      ctx.fillText(`${orgName.toUpperCase()} - COMPLIANCE AUDIT REPORT`, 80, 70);
 
       // Subtitle
       ctx.fillStyle = '#a5f3fc';
       ctx.font = '15px sans-serif';
-      ctx.fillText('รายงานทะเบียนประวัติและการตรวจสอบสภาพครุภัณฑ์ไอทีฉบับสมบูรณ์', 80, 110);
+      ctx.fillText('Comprehensive IT Asset Profile & Compliance Verification Record', 80, 110);
 
       // Top Right Document Info
       ctx.fillStyle = '#ffffff';
@@ -269,7 +274,7 @@ export default function AssetDetailsView({
 
       ctx.fillStyle = '#64748b';
       ctx.font = '11px sans-serif';
-      ctx.fillText('สแกนเพื่อตรวจสอบความถูกต้องในระบบ', qrBoxX + (qrBoxW / 2), qrBoxY + 325);
+      ctx.fillText('Scan to verify asset in the system', qrBoxX + (qrBoxW / 2), qrBoxY + 325);
 
       // Reset text alignment
       ctx.textAlign = 'left';
@@ -279,7 +284,7 @@ export default function AssetDetailsView({
       ctx.fillRect(80, 200, 730, 36);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('ข้อมูลทะเบียนประวัติครุภัณฑ์ทั่วไป (GENERAL INFORMATION)', 100, 223);
+      ctx.fillText('GENERAL INFORMATION & ASSET PROFILE', 100, 223);
 
       let currentY = 275;
       const drawRow = (label: string, value: string, fontBoldValue = false) => {
@@ -304,28 +309,28 @@ export default function AssetDetailsView({
       };
 
       const categoryLabel = asset.category === 'PC' 
-        ? 'PC (คอมพิวเตอร์ตั้งโต๊ะ)' 
+        ? 'PC (Desktop Computer)' 
         : asset.category === 'Notebook' 
-        ? 'Notebook (โน้ตบุ๊ก)' 
+        ? 'Notebook' 
         : asset.category;
 
       const statusText = asset.status === 'In Use'
-        ? 'ใช้งานปกติ (Active)'
+        ? 'Active'
         : asset.status === 'Available'
-        ? 'พร้อมเบิกใช้งาน (Available)'
-        : 'อยู่ระหว่างซ่อมบำรุง (Repair)';
+        ? 'Available'
+        : 'Under Maintenance / Repair';
 
-      drawRow('รหัสครุภัณฑ์ (Asset ID)', asset.id, true);
-      drawRow('ชื่อครุภัณฑ์ (Asset Name)', asset.name, true);
-      drawRow('ยี่ห้อ / แบรนด์ (Brand)', asset.brand || '-');
-      drawRow('รุ่นครุภัณฑ์ (Model)', asset.model || '-');
-      drawRow('กลุ่มหมวดหมู่ (Category)', categoryLabel);
-      drawRow('หมายเลขซีเรียล (Serial No.)', asset.serialNumber || '-');
-      drawRow('แผนกผู้ครอบครอง (Department)', asset.department || '-');
-      drawRow('ฝ่ายการทำงาน (Division)', asset.division || '-');
-      drawRow('ผู้รับผิดชอบหลัก (Responsible)', asset.responsiblePerson || '-');
-      drawRow('สถานะปัจจุบัน (Status)', statusText, true);
-      drawRow('ราคากลางจัดซื้อ (Purchase Price)', asset.purchasePrice ? `${asset.purchasePrice.toLocaleString()} บาท` : '-');
+      drawRow('Asset ID', asset.id, true);
+      drawRow('Asset Name', asset.name, true);
+      drawRow('Brand', asset.brand || '-');
+      drawRow('Model', asset.model || '-');
+      drawRow('Category', categoryLabel);
+      drawRow('Serial Number (S/N)', asset.serialNumber || '-');
+      drawRow('Department / Unit', asset.department || '-');
+      drawRow('Division / Branch', asset.division || '-');
+      drawRow('Responsible Person', asset.responsiblePerson || '-');
+      drawRow('Current Status', statusText, true);
+      drawRow('Purchase Price', asset.purchasePrice ? `${asset.purchasePrice.toLocaleString()} THB` : '-');
 
       // 4. Section 2 - Technical Profile Specifications
       currentY = 740;
@@ -333,7 +338,7 @@ export default function AssetDetailsView({
       ctx.fillRect(80, currentY, 1040, 36);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('คุณสมบัติและคุณลักษณะเฉพาะทางเทคนิค (TECHNICAL SPECIFICATIONS)', 100, currentY + 23);
+      ctx.fillText('TECHNICAL SPECIFICATIONS & HARDWARE PROFILE', 100, currentY + 23);
 
       currentY += 65;
 
@@ -367,48 +372,10 @@ export default function AssetDetailsView({
         currentY += 42;
       };
 
-      drawSpecRow('ระบบปฏิบัติการ (OS)', asset.specOS || '-', 'หน่วยประมวลผล (CPU)', asset.specCPU || '-');
-      drawSpecRow('หน่วยความจำ (RAM)', asset.specRAM || '-', 'ความจุพื้นที่เก็บข้อมูล (Storage)', asset.specStorage || '-');
-      drawSpecRow('ที่อยู่ไอพี (IP Address)', asset.ipAddress || '-', 'ผู้จัดจำหน่าย (Vendor)', asset.vendor || '-');
-      drawSpecRow('ที่อยู่แมคไวไฟ (MAC Wi-Fi)', asset.macWifi || '-', 'ที่อยู่แมคแลน (MAC LAN)', asset.macLan || '-');
-
-      // 5. Section 3 - Additional Detailed Audit Specs (if available)
-      if (asset.detailedSpecs && asset.detailedSpecs.length > 0) {
-        currentY += 15;
-        ctx.fillStyle = '#f1f5f9';
-        ctx.fillRect(80, currentY, 1040, 32);
-        ctx.fillStyle = '#334155';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText('รายการตรวจสอบและขึ้นทะเบียนคุณสมบัติเพิ่มเติม (ADDITIONAL SYSTEM AUDITS)', 100, currentY + 20);
-
-        currentY += 55;
-
-        asset.detailedSpecs.forEach((spec) => {
-          ctx.fillStyle = '#475569';
-          ctx.font = '13px sans-serif';
-          ctx.fillText(spec.item, 90, currentY);
-
-          ctx.fillStyle = '#0f172a';
-          ctx.font = '13px sans-serif';
-          ctx.fillText(spec.details, 420, currentY);
-
-          // Status Badge / Check
-          const isOk = spec.status.includes('ปกติ') || spec.status.toLowerCase().includes('pass') || spec.status.toLowerCase().includes('ok');
-          ctx.fillStyle = isOk ? '#10b981' : '#f59e0b';
-          ctx.font = 'bold 13px sans-serif';
-          ctx.fillText(spec.status, 960, currentY);
-
-          // Divider
-          ctx.strokeStyle = '#f8fafc';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(80, currentY + 10);
-          ctx.lineTo(1120, currentY + 10);
-          ctx.stroke();
-
-          currentY += 36;
-        });
-      }
+      drawSpecRow('Operating System (OS)', asset.specOS || '-', 'Processor (CPU)', asset.specCPU || '-');
+      drawSpecRow('Memory (RAM)', asset.specRAM || '-', 'Storage Capacity', asset.specStorage || '-');
+      drawSpecRow('IP Address', asset.ipAddress || '-', 'Vendor / Supplier', asset.vendor || '-');
+      drawSpecRow('MAC Wi-Fi', asset.macWifi || '-', 'MAC LAN', asset.macLan || '-');
 
       // 6. Section 4 - Auditor Authorization Signature Panel
       currentY = Math.max(currentY + 40, 1340);
@@ -427,19 +394,19 @@ export default function AssetDetailsView({
       ctx.fillStyle = '#334155';
       ctx.font = '13px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('ลงชื่อ.............................................................. ผู้ตรวจสอบ', 300, currentY + 90);
+      ctx.fillText('Signature: .............................................................. Auditor', 300, currentY + 90);
       ctx.fillText('(....................................................................)', 300, currentY + 115);
       ctx.fillStyle = '#64748b';
       ctx.font = '11px sans-serif';
-      ctx.fillText('ตำแหน่ง: IT Officer / Auditor', 300, currentY + 135);
+      ctx.fillText('Title: IT Officer / Auditor', 300, currentY + 135);
 
       ctx.fillStyle = '#334155';
       ctx.textAlign = 'center';
-      ctx.fillText('ลงชื่อ.............................................................. ผู้ตรวจรับรอง', 900, currentY + 90);
+      ctx.fillText('Signature: .............................................................. Approver', 900, currentY + 90);
       ctx.fillText('(....................................................................)', 900, currentY + 115);
       ctx.fillStyle = '#64748b';
       ctx.font = '11px sans-serif';
-      ctx.fillText('ตำแหน่ง: CIO / ผู้ช่วยผู้อำนวยการฝ่ายไอที', 900, currentY + 135);
+      ctx.fillText('Title: CIO / IT Director', 900, currentY + 135);
 
       // 7. Footer Block
       ctx.strokeStyle = '#cbd5e1';
@@ -452,12 +419,12 @@ export default function AssetDetailsView({
       ctx.textAlign = 'left';
       ctx.fillStyle = '#94a3b8';
       ctx.font = '11px sans-serif';
-      ctx.fillText('เอกสารรายงานฉบับนี้จัดทำขึ้นโดยอัตโนมัติผ่านแพลตฟอร์มบริหารจัดการทะเบียนประวัติครุภัณฑ์ของฝ่ายเทคโนโลยีสารสนเทศ', 80, 1635);
-      ctx.fillText('Printed & verified via AssetManager IT Intelligent Tagging Platform. Confidential & Proprietary.', 80, 1655);
+      ctx.fillText('This document was automatically generated by the IT Asset Management and Compliance Platform.', 80, 1635);
+      ctx.fillText(`Generated by ${orgName} Intelligent Tagging Platform. Confidential & Proprietary.`, 80, 1655);
 
       ctx.textAlign = 'right';
       ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('หน้า 1 จาก 1', 1120, 1635);
+      ctx.fillText('Page 1 of 1', 1120, 1635);
 
       // Convert Canvas to PDF
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -468,9 +435,12 @@ export default function AssetDetailsView({
       });
 
       pdf.addImage(imgData, 'JPEG', 0, 0, 1200, 1700);
-      pdf.save(`IT_Asset_Audit_Report_${asset.id}.pdf`);
+      
+      const rawOrgName = localStorage.getItem('assetmanager_org_name') || 'AssetManager IT';
+      const cleanOrgName = rawOrgName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9ก-๙_-]/g, '');
+      pdf.save(`${cleanOrgName}_Audit_Report_${asset.id}.pdf`);
 
-      triggerToast('success', `ส่งออกไฟล์รายงาน PDF ครุภัณฑ์รหัส ${asset.id} สำเร็จ`);
+      triggerToast('success', `ส่งออกไฟล์รายงาน PDF ครุภัณฑ์รหัส ${asset.id} สำหรับหน่วยงาน ${rawOrgName} สำเร็จ`);
     } catch (err) {
       console.error('PDF Export failed:', err);
       triggerToast('error', 'ไม่สามารถส่งออก PDF ได้ กรุณาลองใหม่อีกครั้ง');
@@ -1094,7 +1064,7 @@ export default function AssetDetailsView({
           <div className="space-y-3 text-xs font-medium">
             <div className="flex justify-between border-b border-slate-100 pb-2">
               <span className="text-slate-400">ราคาจัดซื้อ</span>
-              <span className="font-bold text-slate-700">฿ {asset.purchasePrice.toLocaleString()}.00</span>
+              <span className="font-bold text-slate-700">{formatCurrency(asset.purchasePrice, currency)}</span>
             </div>
             <div className="flex justify-between border-b border-slate-100 pb-2">
               <span className="text-slate-400">ผู้จำหน่าย (Vendor)</span>
@@ -1871,8 +1841,8 @@ export default function AssetDetailsView({
                           <div className="flex-1 flex flex-col justify-between h-full py-1 text-left">
                             <div className="space-y-1">
                               {showCorporate && (
-                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-800 border-b border-black pb-0.5 mb-1.5 font-sans">
-                                  🏢 IT ASSET SECURITY TAG
+                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-800 border-b border-black pb-0.5 mb-1.5 font-sans truncate" title={localStorage.getItem('assetmanager_org_name') || 'IT ASSET SECURITY TAG'}>
+                                  🏢 {localStorage.getItem('assetmanager_org_name')?.toUpperCase() || 'IT ASSET SECURITY TAG'}
                                 </p>
                               )}
                               <p className="text-xs font-black text-black leading-tight line-clamp-2 uppercase font-sans">
@@ -1933,7 +1903,7 @@ export default function AssetDetailsView({
                           {/* Badge layout */}
                           <div className="flex justify-between items-start border-b-2 border-black pb-2 w-full">
                             <div className="text-left">
-                              {showCorporate && <p className="text-[10px] font-black tracking-widest text-slate-800 font-sans">🏢 GOVERNMENT IT ASSET CONTROL</p>}
+                              {showCorporate && <p className="text-[10px] font-black tracking-widest text-slate-800 font-sans truncate">🏢 {localStorage.getItem('assetmanager_org_name')?.toUpperCase() || 'GOVERNMENT IT ASSET CONTROL'}</p>}
                               <h5 className="text-sm font-black text-black leading-tight uppercase font-sans mt-0.5">{asset.name}</h5>
                             </div>
                             <span className="text-xs font-mono font-black bg-black text-white px-2 py-0.5 rounded select-all shrink-0">{asset.id}</span>
@@ -2130,7 +2100,7 @@ export default function AssetDetailsView({
           <div className="direct-print-flex">
             <div className="direct-print-info">
               <div>
-                <div className="direct-print-header">🏢 IT ASSET SECURITY TAG</div>
+                <div className="direct-print-header">🏢 {localStorage.getItem('assetmanager_org_name')?.toUpperCase() || 'IT ASSET SECURITY TAG'}</div>
                 <div className="direct-print-name">{asset.name}</div>
                 <div className="direct-print-category">หมวดหมู่: {asset.category}</div>
                 {(asset.responsiblePerson || asset.department) && (

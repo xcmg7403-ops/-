@@ -28,6 +28,18 @@ export default function Topbar({
   onToggleSidebar,
   user,
 }: TopbarProps) {
+  const [orgName, setOrgName] = useState(() => {
+    return localStorage.getItem('assetmanager_org_name') || 'AssetManager IT';
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setOrgName(localStorage.getItem('assetmanager_org_name') || 'AssetManager IT');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [dismissedTicketIds, setDismissedTicketIds] = useState<string[]>([]);
@@ -63,7 +75,7 @@ export default function Topbar({
         </button>
 
         <h2 className="text-sm sm:text-base font-bold text-slate-800 hidden md:block select-none font-sans shrink-0">
-          AssetManager IT
+          {orgName}
         </h2>
 
         <div className="relative w-full max-w-xs sm:max-w-md flex items-center gap-2">

@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Plus,
   Eye,
-  Filter
+  Filter,
+  RefreshCw
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -21,13 +22,19 @@ interface DashboardViewProps {
   onTabChange: (tab: string) => void;
   onSelectAsset: (id: string) => void;
   onOpenAddModal: () => void;
+  lastUpdated?: string | null;
+  onRefresh?: () => Promise<void>;
+  isRefreshing?: boolean;
 }
 
 export default function DashboardView({
   assets,
   onTabChange,
   onSelectAsset,
-  onOpenAddModal
+  onOpenAddModal,
+  lastUpdated,
+  onRefresh,
+  isRefreshing = false
 }: DashboardViewProps) {
   // Compute dynamic stats based on state - fully synchronized without arbitrary offsets
   const totalCount = assets.length;
@@ -69,13 +76,34 @@ export default function DashboardView({
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Title Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-primary select-none font-sans">
-          ระบบบริหารจัดการครุภัณฑ์คอมพิวเตอร์
-        </h2>
-        <p className="text-sm font-sans text-slate-500 mt-1">
-          ภาพรวมข้อมูลทรัพย์สินไอทีประจำวันที่ 24 พฤษภาคม 2567
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-5">
+        <div>
+          <h2 className="text-2xl font-bold text-primary select-none font-sans">
+            ระบบบริหารจัดการครุภัณฑ์คอมพิวเตอร์
+          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1 text-xs text-slate-500 font-sans">
+            <p>
+              ภาพรวมข้อมูลทรัพย์สินไอที
+            </p>
+            {lastUpdated && (
+              <p className="flex items-center gap-1.5 text-slate-400">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                <span>ข้อมูลล่าสุดเมื่อ: <strong className="text-slate-600 font-bold">{lastUpdated}</strong></span>
+              </p>
+            )}
+          </div>
+        </div>
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 hover:text-[#00236f] shadow-xs transition-all cursor-pointer disabled:opacity-50 select-none`}
+            title="ดึงข้อมูลล่าสุดจากระบบคลาวด์ Firebase"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#00236f] ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'กำลังปรับปรุงข้อมูล...' : 'รีเฟรชข้อมูล (Refresh)'}</span>
+          </button>
+        )}
       </div>
 
       {/* Summary Statistics Cards (Bento Style) */}

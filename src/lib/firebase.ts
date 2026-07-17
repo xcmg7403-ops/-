@@ -17,7 +17,7 @@ import {
   signOut as firebaseSignOut 
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Asset, RepairTicket, MaintenanceEvent, UserRecord } from '../types';
+import { Asset, RepairTicket, MaintenanceEvent, UserRecord, BackupRecord } from '../types';
 import { SEED_ASSETS, SEED_REPAIR_TICKETS, SEED_MAINTENANCE_EVENTS } from '../mockData';
 
 // Initialize Firebase App
@@ -417,8 +417,58 @@ export async function clearDatabase(): Promise<void> {
     for (const docSnap of users.docs) {
       await deleteDoc(docSnap.ref);
     }
+
+    const backups = await getDocs(collection(db, BACKUPS_COL));
+    for (const docSnap of backups.docs) {
+      await deleteDoc(docSnap.ref);
+    }
   } catch (error) {
     console.error("Firestore clearDatabase error:", error);
     handleFirestoreError(error, OperationType.DELETE, 'all');
   }
 }
+
+// Backups collection
+export const BACKUPS_COL = 'backups';
+
+export async function getBackups(): Promise<BackupRecord[]> {
+  try {
+    const querySnapshot = await getDocs(collection(db, BACKUPS_COL));
+    const list: BackupRecord[] = [];
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      list.push({
+        id: docSnap.id,
+        timestamp: data.timestamp || '',
+        schedule: data.schedule || '',
+        assets: data.assets || [],
+        repairTickets: data.repairTickets || [],
+        maintenanceEvents: data.maintenanceEvents || []
+      });
+    });
+    // Sort descending by timestamp
+    return list.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  } catch (error) {
+    console.error("Firestore getBackups error:", error);
+    return [];
+  }
+}
+
+export async function saveBackup(backup: BackupRecord): Promise<void> {
+  try {
+    await setDoc(doc(db, BACKUPS_COL, backup.id), cleanUndefined(backup));
+  } catch (error) {
+    console.error("Firestore saveBackup error:", error);
+    handleFirestoreError(error, OperationType.WRITE, `${BACKUPS_COL}/${backup.id}`);
+  }
+}
+
+export async function deleteBackup(id: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, BACKUPS_COL, id));
+  } catch (error) {
+    console.error("Firestore deleteBackup error:", error);
+    handleFirestoreError(error, OperationType.DELETE, `${BACKUPS_COL}/${id}`);
+  }
+}
+

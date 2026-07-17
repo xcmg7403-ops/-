@@ -305,16 +305,44 @@ export default function QRScannerModal({
                     
                     {/* Glowing scanning target overlays */}
                     {isScanning && !scannedResult && (
-                      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6">
-                        <div className="flex justify-between">
-                          <span className="w-5 h-5 border-t-2 border-l-2 border-sky-400"></span>
-                          <span className="w-5 h-5 border-t-2 border-r-2 border-sky-400"></span>
+                      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                        {/* Outer dark shade with clear center cutout layout */}
+                        <div className="absolute inset-0 flex flex-col">
+                          <div className="h-[22%] bg-black/55"></div>
+                          <div className="h-[56%] flex">
+                            <div className="w-[12%] bg-black/55"></div>
+                            {/* Centered Target Frame */}
+                            <div className="w-[76%] h-full bg-transparent border-2 border-dashed border-sky-400/50 rounded-xl relative">
+                              {/* 4 Thick Outer Glowing Corners */}
+                              <span className="absolute -top-1.5 -left-1.5 w-6 h-6 border-t-4 border-l-4 border-sky-400 rounded-tl-md filter drop-shadow-[0_0_4px_rgba(56,189,248,0.5)]"></span>
+                              <span className="absolute -top-1.5 -right-1.5 w-6 h-6 border-t-4 border-r-4 border-sky-400 rounded-tr-md filter drop-shadow-[0_0_4px_rgba(56,189,248,0.5)]"></span>
+                              <span className="absolute -bottom-1.5 -left-1.5 w-6 h-6 border-b-4 border-l-4 border-sky-400 rounded-bl-md filter drop-shadow-[0_0_4px_rgba(56,189,248,0.5)]"></span>
+                              <span className="absolute -bottom-1.5 -right-1.5 w-6 h-6 border-b-4 border-r-4 border-sky-400 rounded-br-md filter drop-shadow-[0_0_4px_rgba(56,189,248,0.5)]"></span>
+                              
+                              {/* Animated Red Scan Laser */}
+                              <div className="absolute left-1.5 right-1.5 h-[2px] bg-red-500 shadow-[0_0_12px_#ef4444] rounded-full animate-bounce top-1/2 -translate-y-1/2"></div>
+
+                              {/* Center target indicator circle */}
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-sky-300/35 flex items-center justify-center">
+                                <div className="w-1.5 h-1.5 rounded-full bg-sky-300/60"></div>
+                              </div>
+
+                              {/* Inner align banner */}
+                              <div className="absolute bottom-3 left-0 right-0 text-center">
+                                <span className="bg-slate-900/85 text-[8.5px] font-black text-sky-300 px-2 py-0.5 rounded uppercase tracking-widest animate-pulse border border-sky-500/20">
+                                  จัดแนวคิวอาร์โค้ดที่นี่
+                                </span>
+                              </div>
+                            </div>
+                            <div className="w-[12%] bg-black/55"></div>
+                          </div>
+                          <div className="h-[22%] bg-black/55"></div>
                         </div>
-                        {/* Red Laser line */}
-                        <div className="w-full h-[1.5px] bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-bounce"></div>
-                        <div className="flex justify-between">
-                          <span className="w-5 h-5 border-b-2 border-l-2 border-sky-400"></span>
-                          <span className="w-5 h-5 border-b-2 border-r-2 border-sky-400"></span>
+
+                        {/* Top corner live camera tag */}
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-[#00236f]/95 text-white text-[8.5px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shadow-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                          <span>Live Camera</span>
                         </div>
                       </div>
                     )}
@@ -338,9 +366,12 @@ export default function QRScannerModal({
 
               {/* Helper guide */}
               {!hasCameraError && !scannedResult && (
-                <div className="text-center">
-                  <p className="text-[11px] text-slate-400 font-medium">
-                    หันกล้องของคุณเข้าหา QR Code แท็กครุภัณฑ์เพื่อสแกนรหัสอัตโนมัติ
+                <div className="text-center bg-sky-50/50 p-3 rounded-xl border border-sky-100/50 space-y-1">
+                  <p className="text-[11px] text-[#00236f] font-bold flex items-center justify-center gap-1">
+                    🔍 คำแนะนำการสแกน QR Code
+                  </p>
+                  <p className="text-[10px] text-slate-500 font-medium leading-normal max-w-[240px] mx-auto">
+                    โปรดวางกล้องให้ขนานกับครุภัณฑ์ และจัดให้รหัส QR อยู่ตรงกลางกรอบสี่เหลี่ยมสีฟ้าจนกว่าเครื่องจะอ่านค่าอัตโนมัติ
                   </p>
                 </div>
               )}

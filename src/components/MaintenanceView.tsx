@@ -266,10 +266,7 @@ export default function MaintenanceView({
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">รอดำเนินการ</p>
                 <h3 className="text-3xl font-extrabold text-slate-800 font-sans mt-0.5">{pendingCount}</h3>
               </div>
-              <p className="text-xs text-rose-600 flex items-center gap-1 font-semibold select-none">
-                <TrendingUp className="w-3.5 h-3.5" />
-                <span>+2 ตั้งแต่เมื่อวาน</span>
-              </p>
+              <p className="text-xs text-rose-600 flex items-center gap-1 font-semibold select-none" />
             </div>
 
             {/* Repairing Card */}
