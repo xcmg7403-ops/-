@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import { Asset, AssetCategory, AssetStatus } from '../types';
+import { getCurrencySymbol } from '../lib/currency';
 import {
   Search,
   Plus,
@@ -39,6 +40,7 @@ interface InventoryViewProps {
   onDeleteAsset: (id: string) => void;
   triggerToast: (type: 'success' | 'error' | 'info', message: string) => void;
   onImportAssets?: (assets: Asset[]) => void;
+  currency?: string;
 }
 
 export default function InventoryView({
@@ -48,7 +50,8 @@ export default function InventoryView({
   onEditAsset,
   onDeleteAsset,
   triggerToast,
-  onImportAssets
+  onImportAssets,
+  currency = 'THB (฿) - Thai Baht'
 }: InventoryViewProps) {
   // Filters & State
   const [selectedCategory, setSelectedCategory] = useState<string>('ทั้งหมด');
@@ -1368,6 +1371,7 @@ export default function InventoryView({
                       placeholder="เช่น Intel Core i5-12400"
                     />
                   </div>
+      
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">
@@ -1598,7 +1602,7 @@ export default function InventoryView({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      ราคาซื้อ (บาท)
+                      {`ราคาซื้อ (Price - ${getCurrencySymbol(currency)})`}
                     </label>
                     <input
                       type="number"

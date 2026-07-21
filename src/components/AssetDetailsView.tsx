@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import { Asset, AssetStatus } from '../types';
-import { formatCurrency } from '../lib/currency';
+import { formatCurrency, getCurrencySymbol } from '../lib/currency';
 import {
   ChevronRight,
   Printer,
@@ -180,7 +180,7 @@ export default function AssetDetailsView({
 
   const exportToPDF = async () => {
     setIsExporting(true);
-    triggerToast('info', 'กำลังจัดทำรายงานผลการขึ้นทะเบียนและการตรวจสอบ (Audit PDF)...');
+    triggerToast('info', 'กำลังจัดทำรายงานผลการขึ้นทะเบียนและการตรวจสอบ (Compliance Audit PDF)...');
 
     try {
       const canvas = document.createElement('canvas');
@@ -191,32 +191,65 @@ export default function AssetDetailsView({
 
       const orgName = localStorage.getItem('assetmanager_org_name') || 'AssetManager IT';
 
+      // ================= PAGE 1 =================
       // 1. Background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 1200, 1700);
 
-      // 2. Deep Blue Top Header Banner
+      // 2. White Logo Header Block
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText(orgName.toUpperCase(), 80, 50);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '12px sans-serif';
+      const cleanWebDomain = orgName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'suteegroup';
+      ctx.fillText(`IT Asset Management & Compliance Division | www.${cleanWebDomain}.example.com`, 80, 72);
+
+      // 3. Deep Blue Header Banner
       ctx.fillStyle = '#00236f';
-      ctx.fillRect(0, 0, 1200, 160);
+      ctx.fillRect(0, 100, 1200, 140);
 
       // Title Text
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 26px sans-serif';
-      ctx.fillText(`${orgName.toUpperCase()} - COMPLIANCE AUDIT REPORT`, 80, 70);
+      ctx.fillText(`${orgName.toUpperCase()} COMPLIANCE AUDIT REPORT`, 80, 160);
 
       // Subtitle
       ctx.fillStyle = '#a5f3fc';
       ctx.font = '15px sans-serif';
-      ctx.fillText('Comprehensive IT Asset Profile & Compliance Verification Record', 80, 110);
+      ctx.fillText('Comprehensive IT Asset Profile & Compliance Verification Record', 80, 200);
 
-      // Top Right Document Info
+      // Top Right Document Info & Confidential Pill Badge
+      // Draw rounded Red Confidential Badge
+      const confX = 980;
+      const confY = 130;
+      const confW = 140;
+      const confH = 26;
+      const confR = 6;
+      ctx.fillStyle = '#e11d48'; // Rose 600
+      ctx.beginPath();
+      ctx.moveTo(confX + confR, confY);
+      ctx.arcTo(confX + confW, confY, confX + confW, confY + confH, confR);
+      ctx.arcTo(confX + confW, confY + confH, confX, confY + confH, confR);
+      ctx.arcTo(confX, confY + confH, confX, confY, confR);
+      ctx.arcTo(confX, confY, confX + confW, confY, confR);
+      ctx.closePath();
+      ctx.fill();
+
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('CONFIDENTIAL', confX + (confW / 2), confY + 17);
+
+      // Add other top-right document info
       ctx.textAlign = 'right';
-      ctx.fillText('DOCUMENT TYPE: AUDIT PROFILE', 1120, 60);
+      ctx.fillStyle = '#e2e8f0';
       ctx.font = '11px sans-serif';
-      ctx.fillText(`PRINTED ON: ${new Date().toLocaleString('th-TH')}`, 1120, 90);
-      ctx.fillText(`AUDIT ID: IA-${asset.id}-${new Date().getFullYear()}`, 1120, 115);
+      ctx.fillText('DOCUMENT TYPE: Audit Profile', 1120, 175);
+      ctx.fillText(`PRINTED ON: ${new Date().toLocaleString('th-TH')}`, 1120, 195);
+      ctx.fillText(`AUDIT ID: IA-${new Date().getFullYear()}`, 1120, 215);
 
       // Reset text alignment
       ctx.textAlign = 'left';
@@ -236,76 +269,108 @@ export default function AssetDetailsView({
         console.error('QR load failed inside PDF:', err);
       }
 
-      // Draw QR Tag Panel Box on the right
-      const qrBoxX = 840;
-      const qrBoxY = 200;
-      const qrBoxW = 280;
-      const qrBoxH = 360;
-      const radius = 16;
+      // Draw General Information Rounded Card Container (Left Column)
+      const giX = 80;
+      const giY = 280;
+      const giW = 730;
+      const giH = 590;
+      const giR = 12;
 
-      ctx.fillStyle = '#f8fafc';
+      ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 2;
-      
-      // Draw rounded rect manually for backward compatibility
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(qrBoxX + radius, qrBoxY);
-      ctx.arcTo(qrBoxX + qrBoxW, qrBoxY, qrBoxX + qrBoxW, qrBoxY + qrBoxH, radius);
-      ctx.arcTo(qrBoxX + qrBoxW, qrBoxY + qrBoxH, qrBoxX, qrBoxY + qrBoxH, radius);
-      ctx.arcTo(qrBoxX, qrBoxY + qrBoxH, qrBoxX, qrBoxY, radius);
-      ctx.arcTo(qrBoxX, qrBoxY, qrBoxX + qrBoxW, qrBoxY, radius);
+      ctx.moveTo(giX + giR, giY);
+      ctx.arcTo(giX + giW, giY, giX + giW, giY + giH, giR);
+      ctx.arcTo(giX + giW, giY + giH, giX, giY + giH, giR);
+      ctx.arcTo(giX, giY + giH, giX, giY, giR);
+      ctx.arcTo(giX, giY, giX + giW, giY, giR);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      if (qrImg) {
-        ctx.drawImage(qrImg, qrBoxX + 40, qrBoxY + 30, 200, 200);
-      }
-
-      // Label inside QR Box
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('SECURE ASSET TAG', qrBoxX + (qrBoxW / 2), qrBoxY + 265);
-
+      // Rounded Navy blue banner for header inside General Info
       ctx.fillStyle = '#00236f';
-      ctx.font = 'bold 14px monospace';
-      ctx.fillText(asset.id, qrBoxX + (qrBoxW / 2), qrBoxY + 295);
+      ctx.beginPath();
+      ctx.moveTo(giX + giR, giY);
+      ctx.arcTo(giX + giW, giY, giX + giW, giY + 40, giR);
+      ctx.lineTo(giX + giW, giY + 40);
+      ctx.lineTo(giX, giY + 40);
+      ctx.arcTo(giX, giY, giX + giW, giY, giR);
+      ctx.closePath();
+      ctx.fill();
 
-      ctx.fillStyle = '#64748b';
-      ctx.font = '11px sans-serif';
-      ctx.fillText('Scan to verify asset in the system', qrBoxX + (qrBoxW / 2), qrBoxY + 325);
-
-      // Reset text alignment
-      ctx.textAlign = 'left';
-
-      // 3. Section 1 - General Asset Information
-      ctx.fillStyle = '#00236f';
-      ctx.fillRect(80, 200, 730, 36);
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('GENERAL INFORMATION & ASSET PROFILE', 100, 223);
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('GENERAL INFORMATION & ASSET PROFILE', giX + 20, giY + 25);
 
-      let currentY = 275;
+      // General Info Row Drawer
+      let currentRowY = giY + 70;
       const drawRow = (label: string, value: string, fontBoldValue = false) => {
         ctx.textAlign = 'left';
         ctx.fillStyle = '#64748b';
-        ctx.font = '14px sans-serif';
-        ctx.fillText(label, 90, currentY);
+        ctx.font = '13px sans-serif';
+        ctx.fillText(label, giX + 20, currentRowY);
         
-        ctx.fillStyle = '#0f172a';
-        ctx.font = fontBoldValue ? 'bold 14px sans-serif' : '14px sans-serif';
-        ctx.fillText(value || '-', 360, currentY);
+        if (label === 'Current Status') {
+          // Draw high-quality badge
+          let badgeBg = '#f0fdf4';
+          let badgeBorder = '#bbf7d0';
+          let badgeText = '#166534';
+          let txt = 'ACTIVE';
 
-        // Subtle separator line
+          if (value.toLowerCase().includes('available')) {
+            badgeBg = '#f0f9ff';
+            badgeBorder = '#bae6fd';
+            badgeText = '#075985';
+            txt = 'AVAILABLE';
+          } else if (value.toLowerCase().includes('maintenance') || value.toLowerCase().includes('repair')) {
+            badgeBg = '#fff7ed';
+            badgeBorder = '#fed7aa';
+            badgeText = '#9a3412';
+            txt = 'UNDER MAINTENANCE';
+          }
+
+          ctx.fillStyle = badgeBg;
+          ctx.strokeStyle = badgeBorder;
+          ctx.lineWidth = 1;
+          
+          const bx = giX + 280;
+          const by = currentRowY - 15;
+          const bw = 150;
+          const bh = 22;
+          const br = 11;
+          
+          ctx.beginPath();
+          ctx.moveTo(bx + br, by);
+          ctx.arcTo(bx + bw, by, bx + bw, by + bh, br);
+          ctx.arcTo(bx + bw, by + bh, bx, by + bh, br);
+          ctx.arcTo(bx, by + bh, bx, by, br);
+          ctx.arcTo(bx, by, bx + bw, by, br);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = badgeText;
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(txt, bx + (bw / 2), by + 15);
+          ctx.textAlign = 'left';
+        } else {
+          ctx.fillStyle = '#0f172a';
+          ctx.font = fontBoldValue ? 'bold 13px sans-serif' : '13px sans-serif';
+          ctx.fillText(value || '-', giX + 280, currentRowY);
+        }
+
+        // Horizontal separator line
         ctx.strokeStyle = '#f1f5f9';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(80, currentY + 12);
-        ctx.lineTo(810, currentY + 12);
+        ctx.moveTo(giX + 15, currentRowY + 12);
+        ctx.lineTo(giX + giW - 15, currentRowY + 12);
         ctx.stroke();
 
-        currentY += 40;
+        currentRowY += 40;
       };
 
       const categoryLabel = asset.category === 'PC' 
@@ -320,6 +385,17 @@ export default function AssetDetailsView({
         ? 'Available'
         : 'Under Maintenance / Repair';
 
+      let calculatedEol = '-';
+      if (asset.purchaseDate) {
+        try {
+          const date = new Date(asset.purchaseDate);
+          date.setFullYear(date.getFullYear() + 5);
+          calculatedEol = date.toISOString().split('T')[0];
+        } catch (e) {
+          calculatedEol = '-';
+        }
+      }
+
       drawRow('Asset ID', asset.id, true);
       drawRow('Asset Name', asset.name, true);
       drawRow('Brand', asset.brand || '-');
@@ -330,85 +406,198 @@ export default function AssetDetailsView({
       drawRow('Division / Branch', asset.division || '-');
       drawRow('Responsible Person', asset.responsiblePerson || '-');
       drawRow('Current Status', statusText, true);
-      drawRow('Purchase Price', asset.purchasePrice ? `${asset.purchasePrice.toLocaleString()} THB` : '-');
+      drawRow('Purchase Price', asset.purchasePrice ? formatCurrency(asset.purchasePrice, currency) : '-');
+      drawRow('Warranty Expiry', asset.warrantyExpiryDate || '-');
+      drawRow('Expected EOL Date', calculatedEol);
 
-      // 4. Section 2 - Technical Profile Specifications
-      currentY = 740;
-      ctx.fillStyle = '#00236f';
-      ctx.fillRect(80, currentY, 1040, 36);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('TECHNICAL SPECIFICATIONS & HARDWARE PROFILE', 100, currentY + 23);
+      // Draw Secure Asset Tag Container (Right Column, Card 1)
+      const qrBoxX = 840;
+      const qrBoxY = 280;
+      const qrBoxW = 280;
+      const qrBoxH = 360;
+      const radius = 12;
 
-      currentY += 65;
-
-      const drawSpecRow = (label1: string, val1: string, label2: string, val2: string) => {
-        ctx.textAlign = 'left';
-        
-        // Col 1
-        ctx.fillStyle = '#64748b';
-        ctx.font = '14px sans-serif';
-        ctx.fillText(label1, 90, currentY);
-        ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 14px sans-serif';
-        ctx.fillText(val1 || '-', 280, currentY);
-
-        // Col 2
-        ctx.fillStyle = '#64748b';
-        ctx.font = '14px sans-serif';
-        ctx.fillText(label2, 630, currentY);
-        ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 14px sans-serif';
-        ctx.fillText(val2 || '-', 850, currentY);
-
-        // Divider
-        ctx.strokeStyle = '#f1f5f9';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(80, currentY + 12);
-        ctx.lineTo(1120, currentY + 12);
-        ctx.stroke();
-
-        currentY += 42;
-      };
-
-      drawSpecRow('Operating System (OS)', asset.specOS || '-', 'Processor (CPU)', asset.specCPU || '-');
-      drawSpecRow('Memory (RAM)', asset.specRAM || '-', 'Storage Capacity', asset.specStorage || '-');
-      drawSpecRow('IP Address', asset.ipAddress || '-', 'Vendor / Supplier', asset.vendor || '-');
-      drawSpecRow('MAC Wi-Fi', asset.macWifi || '-', 'MAC LAN', asset.macLan || '-');
-
-      // 6. Section 4 - Auditor Authorization Signature Panel
-      currentY = Math.max(currentY + 40, 1340);
-
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1;
-
-      // Draw Sign lines
+      ctx.fillStyle = '#f8fafc';
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.5;
+      
       ctx.beginPath();
-      ctx.moveTo(120, currentY + 60);
-      ctx.lineTo(480, currentY + 60);
-      ctx.moveTo(720, currentY + 60);
-      ctx.lineTo(1080, currentY + 60);
+      ctx.moveTo(qrBoxX + radius, qrBoxY);
+      ctx.arcTo(qrBoxX + qrBoxW, qrBoxY, qrBoxX + qrBoxW, qrBoxY + qrBoxH, radius);
+      ctx.arcTo(qrBoxX + qrBoxW, qrBoxY + qrBoxH, qrBoxX, qrBoxY + qrBoxH, radius);
+      ctx.arcTo(qrBoxX, qrBoxY + qrBoxH, qrBoxX, qrBoxY, radius);
+      ctx.arcTo(qrBoxX, qrBoxY, qrBoxX + qrBoxW, qrBoxY, radius);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = '#334155';
-      ctx.font = '13px sans-serif';
+      if (qrImg) {
+        ctx.drawImage(qrImg, qrBoxX + 40, qrBoxY + 30, 200, 200);
+      }
+
+      // Labels inside Secure Asset Tag Card
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 15px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Signature: .............................................................. Auditor', 300, currentY + 90);
-      ctx.fillText('(....................................................................)', 300, currentY + 115);
+      ctx.fillText('SECURE ASSET TAG', qrBoxX + (qrBoxW / 2), qrBoxY + 265);
+
+      ctx.fillStyle = '#00236f';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText(asset.id, qrBoxX + (qrBoxW / 2), qrBoxY + 295);
+
       ctx.fillStyle = '#64748b';
       ctx.font = '11px sans-serif';
-      ctx.fillText('Title: IT Officer / Auditor', 300, currentY + 135);
+      ctx.fillText('Scan to verify asset in the system', qrBoxX + (qrBoxW / 2), qrBoxY + 320);
+      ctx.fillText(`Serial No. ${asset.serialNumber || 'N/A'}`, qrBoxX + (qrBoxW / 2), qrBoxY + 338);
 
-      ctx.fillStyle = '#334155';
-      ctx.textAlign = 'center';
-      ctx.fillText('Signature: .............................................................. Approver', 900, currentY + 90);
-      ctx.fillText('(....................................................................)', 900, currentY + 115);
+      // Reset text alignment
+      ctx.textAlign = 'left';
+
+      // Draw Audit Result Card (Right Column, Card 2)
+      const arX = 840;
+      const arY = 660;
+      const arW = 280;
+      const arH = 210;
+      const arR = 12;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(arX + arR, arY);
+      ctx.arcTo(arX + arW, arY, arX + arW, arY + arH, arR);
+      ctx.arcTo(arX + arW, arY + arH, arX, arY + arH, arR);
+      ctx.arcTo(arX, arY + arH, arX, arY, arR);
+      ctx.arcTo(arX, arY, arX + arW, arY, arR);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Rounded Navy banner inside Audit Result Card
+      ctx.fillStyle = '#00236f';
+      ctx.beginPath();
+      ctx.moveTo(arX + arR, arY);
+      ctx.arcTo(arX + arW, arY, arX + arW, arY + 40, arR);
+      ctx.lineTo(arX + arW, arY + 40);
+      ctx.lineTo(arX, arY + 40);
+      ctx.arcTo(arX, arY, arX + arW, arY, arR);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('AUDIT RESULT', arX + 20, arY + 25);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('Overall Compliance Status', arX + 20, arY + 65);
+
+      const isCompliant = asset.status === 'In Use';
+      const isPartial = asset.status === 'Available';
+      const isNonCompliant = asset.status === 'Repair';
+
+      const drawCheckbox = (cx: number, cy: number, label: string, checked: boolean) => {
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(cx, cy, 14, 14);
+
+        if (checked) {
+          ctx.fillStyle = '#00236f';
+          ctx.font = 'bold 12px sans-serif';
+          ctx.fillText('✓', cx + 2, cy + 11);
+        }
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '13px sans-serif';
+        ctx.fillText(label, cx + 22, cy + 12);
+      };
+
+      drawCheckbox(arX + 20, arY + 82, 'Compliant', isCompliant);
+      drawCheckbox(arX + 20, arY + 107, 'Partial', isPartial);
+      drawCheckbox(arX + 20, arY + 132, 'Non-Compliant', isNonCompliant);
+
       ctx.fillStyle = '#64748b';
       ctx.font = '11px sans-serif';
-      ctx.fillText('Title: CIO / IT Director', 900, currentY + 135);
+      ctx.fillText('Next Audit Due: .......................................', arX + 20, arY + 180);
 
-      // 7. Footer Block
+      // Draw Section 2 - Technical Specifications Grid (Page 1 Bottom)
+      const tsX = 80;
+      const tsY = 900;
+      const tsW = 1040;
+      const tsH = 320;
+      const tsR = 12;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(tsX + tsR, tsY);
+      ctx.arcTo(tsX + tsW, tsY, tsX + tsW, tsY + tsH, tsR);
+      ctx.arcTo(tsX + tsW, tsY + tsH, tsX, tsY + tsH, tsR);
+      ctx.arcTo(tsX, tsY + tsH, tsX, tsY, tsR);
+      ctx.arcTo(tsX, tsY, tsX + tsW, tsY, tsR);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Rounded Navy Banner for Technical Specs
+      ctx.fillStyle = '#00236f';
+      ctx.beginPath();
+      ctx.moveTo(tsX + tsR, tsY);
+      ctx.arcTo(tsX + tsW, tsY, tsX + tsW, tsY + 40, tsR);
+      ctx.lineTo(tsX + tsW, tsY + 40);
+      ctx.lineTo(tsX, tsY + 40);
+      ctx.arcTo(tsX, tsY, tsX + tsW, tsY, tsR);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('TECHNICAL SPECIFICATIONS & HARDWARE', tsX + 20, tsY + 25);
+
+      // Draw spec boxes with ZERO overlap!
+      const drawSpecBox = (bx: number, by: number, label: string, value: string) => {
+        ctx.fillStyle = '#f8fafc';
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        
+        const bw = 490;
+        const bh = 54;
+        const br = 6;
+
+        ctx.beginPath();
+        ctx.moveTo(bx + br, by);
+        ctx.arcTo(bx + bw, by, bx + bw, by + bh, br);
+        ctx.arcTo(bx + bw, by + bh, bx, by + bh, br);
+        ctx.arcTo(bx, by + bh, bx, by, br);
+        ctx.arcTo(bx, by, bx + bw, by, br);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillText(label.toUpperCase(), bx + 15, by + 18);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(value || '-', bx + 15, by + 38);
+      };
+
+      // Spec row grid positions
+      drawSpecBox(95, 960, 'Operating System (OS)', asset.specOS || '-');
+      drawSpecBox(615, 960, 'Processor (CPU)', asset.specCPU || '-');
+
+      drawSpecBox(95, 1025, 'Memory (RAM)', asset.specRAM || '-');
+      drawSpecBox(615, 1025, 'Storage Capacity', asset.specStorage || '-');
+
+      drawSpecBox(95, 1090, 'IP Address', asset.ipAddress || '-');
+      drawSpecBox(615, 1090, 'Vendor / Supplier', asset.vendor || '-');
+
+      drawSpecBox(95, 1155, 'MAC Wi-Fi', asset.macWifi || '-');
+      drawSpecBox(615, 1155, 'MAC LAN', asset.macLan || '-');
+
+      // Page 1 Footer Block
       ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -418,29 +607,282 @@ export default function AssetDetailsView({
 
       ctx.textAlign = 'left';
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '11px sans-serif';
-      ctx.fillText('This document was automatically generated by the IT Asset Management and Compliance Platform.', 80, 1635);
-      ctx.fillText(`Generated by ${orgName} Intelligent Tagging Platform. Confidential & Proprietary.`, 80, 1655);
+      ctx.font = '9px sans-serif';
+      ctx.fillText(`Document No.: IA-${asset.id}-${new Date().getFullYear()}   Version: 1.0   Classification: CONFIDENTIAL`, 80, 1630);
+      ctx.fillText(`Generated by ${orgName} Intelligent Tagging Platform. This document is confidential and proprietary.`, 80, 1650);
 
       ctx.textAlign = 'right';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('Page 1 of 1', 1120, 1635);
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('Page 1 of 2', 1120, 1630);
 
-      // Convert Canvas to PDF
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      // Create PDF Instance with Page 1 Image
+      const imgData1 = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'px',
         format: [1200, 1700],
       });
+      pdf.addImage(imgData1, 'JPEG', 0, 0, 1200, 1700);
 
-      pdf.addImage(imgData, 'JPEG', 0, 0, 1200, 1700);
+
+      // ================= PAGE 2 =================
+      // Clear Canvas for page 2
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 1200, 1700);
+
+      // Logo/Header Area (Page 2)
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText(orgName.toUpperCase(), 80, 50);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`IT Asset Management & Compliance Division | www.${cleanWebDomain}.example.com`, 80, 72);
+
+      ctx.fillStyle = '#00236f';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillText('Compliance Verification & Sign-off', 80, 102);
+
+      // Dividing top line
+      ctx.strokeStyle = '#00236f';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(80, 115);
+      ctx.lineTo(1120, 115);
+      ctx.stroke();
+
+      // Draw Security & Compliance Checklist rounded panel container
+      const clX = 80;
+      const clY = 140;
+      const clW = 1040;
+      const clH = 430;
+      const clR = 12;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(clX + clR, clY);
+      ctx.arcTo(clX + clW, clY, clX + clW, clY + clH, clR);
+      ctx.arcTo(clX + clW, clY + clH, clX, clY + clH, clR);
+      ctx.arcTo(clX, clY + clH, clX, clY, clR);
+      ctx.arcTo(clX, clY, clX + clW, clY, clR);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Rounded Navy blue header for Compliance Checklist
+      ctx.fillStyle = '#00236f';
+      ctx.beginPath();
+      ctx.moveTo(clX + clR, clY);
+      ctx.arcTo(clX + clW, clY, clX + clW, clY + 40, clR);
+      ctx.lineTo(clX + clW, clY + 40);
+      ctx.lineTo(clX, clY + 40);
+      ctx.arcTo(clX, clY, clX + clW, clY, clR);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('SECURITY & COMPLIANCE CHECKLIST', clX + 20, clY + 25);
+
+      // Table Row Column Headers
+      const tableHeaderY = clY + 40; // 180
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillRect(80, tableHeaderY, 1040, 35);
       
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(80, tableHeaderY, 1040, 35);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No.', 105, tableHeaderY + 22);
+      ctx.textAlign = 'left';
+      ctx.fillText('Compliance Item', 150, tableHeaderY + 22);
+      ctx.textAlign = 'center';
+      ctx.fillText('Status', 780, tableHeaderY + 22);
+      ctx.textAlign = 'left';
+      ctx.fillText('Remarks', 950, tableHeaderY + 22);
+
+      const checklistItems = [
+        'Antivirus / Endpoint Protection Installed',
+        'Operating System License Valid',
+        'Disk Encryption Enabled (BitLocker / FileVault)',
+        'Latest OS Security Patch Applied',
+        'Asset Tag Physically Verified',
+        'Data Backup Configured',
+        'No Unauthorized Software Detected',
+        'Physical Condition Free of Damage'
+      ];
+
+      // Render Rows
+      let rowY = tableHeaderY + 35; // 215
+      checklistItems.forEach((item, idx) => {
+        // Draw row background (alternate off-white)
+        ctx.fillStyle = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+        ctx.fillRect(80, rowY, 1040, 39);
+
+        // Draw borders for row
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(80, rowY, 1040, 39);
+
+        // Column lines
+        // No. column boundary line at X: 130
+        ctx.beginPath();
+        ctx.moveTo(130, rowY);
+        ctx.lineTo(130, rowY + 39);
+        // Status column boundary line at X: 660
+        ctx.moveTo(660, rowY);
+        ctx.lineTo(660, rowY + 39);
+        // Remarks column boundary line at X: 900
+        ctx.moveTo(900, rowY);
+        ctx.lineTo(900, rowY + 39);
+        ctx.stroke();
+
+        // Print texts
+        ctx.fillStyle = '#334155';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText((idx + 1).toString(), 105, rowY + 24);
+
+        ctx.textAlign = 'left';
+        ctx.fillText(item, 150, rowY + 24);
+
+        // Draw Status check squares inside Status column
+        const drawRowCheckbox = (cx: number, cy: number, label: string) => {
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(cx, cy, 12, 12);
+          ctx.fillStyle = '#475569';
+          ctx.font = '11px sans-serif';
+          ctx.fillText(label, cx + 18, cy + 10);
+        };
+
+        drawRowCheckbox(680, rowY + 13, 'Pass');
+        drawRowCheckbox(750, rowY + 13, 'Fail');
+        drawRowCheckbox(820, rowY + 13, 'N/A');
+
+        rowY += 39;
+      });
+
+      // Draw Auditor's Remarks & Recommendations Container Box
+      const remX = 80;
+      const remY = 600;
+      const remW = 1040;
+      const remH = 210;
+      const remR = 12;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(remX + remR, remY);
+      ctx.arcTo(remX + remW, remY, remX + remW, remY + remH, remR);
+      ctx.arcTo(remX + remW, remY + remH, remX, remY + remH, remR);
+      ctx.arcTo(remX, remY + remH, remX, remY, remR);
+      ctx.arcTo(remX, remY, remX + remW, remY, remR);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Rounded Navy banner inside Remarks Box
+      ctx.fillStyle = '#00236f';
+      ctx.beginPath();
+      ctx.moveTo(remX + remR, remY);
+      ctx.arcTo(remX + remW, remY, remX + remW, remY + 40, remR);
+      ctx.lineTo(remX + remW, remY + 40);
+      ctx.lineTo(remX, remY + 40);
+      ctx.arcTo(remX, remY, remX + remW, remY, remR);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText("AUDITOR'S REMARKS & RECOMMENDATIONS", remX + 20, remY + 25);
+
+      // Draw light grey dotted horizontal writing lines inside remarks area
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      
+      let lineY = remY + 75;
+      for (let j = 0; j < 3; j++) {
+        ctx.beginPath();
+        ctx.moveTo(100, lineY);
+        ctx.lineTo(1100, lineY);
+        ctx.stroke();
+        lineY += 38;
+      }
+      ctx.setLineDash([]); // Reset line dash
+
+      // Auditor Signature Sign-off panel
+      const signY = 850;
+
+      const drawSignBlock = (colX: number, title: string) => {
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+
+        // Signature line
+        ctx.beginPath();
+        ctx.moveTo(colX, signY + 60);
+        ctx.lineTo(colX + 280, signY + 60);
+        ctx.stroke();
+
+        ctx.fillStyle = '#334155';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('Signature: __________________________', colX, signY + 54);
+        ctx.fillText('Name: ....................................................', colX, signY + 88);
+        
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(`Title: ${title}`, colX, signY + 114);
+        
+        ctx.fillStyle = '#334155';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('Date: ....................................................', colX, signY + 140);
+      };
+
+      // Three side-by-side columns matching screenshot 2 exactly
+      drawSignBlock(80, 'IT Officer / Auditor');
+      drawSignBlock(460, 'IT Manager');
+      drawSignBlock(840, 'CIO / IT Director');
+
+      // Page 2 Footer Block
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(80, 1600);
+      ctx.lineTo(1120, 1600);
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px sans-serif';
+      ctx.fillText(`Document No.: IA-${asset.id}-${new Date().getFullYear()}   Version: 1.0   Classification: CONFIDENTIAL`, 80, 1630);
+      ctx.fillText(`Generated by ${orgName} Intelligent Tagging Platform. This document is confidential and proprietary.`, 80, 1650);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('Page 2 of 2', 1120, 1630);
+
+      // Add Page 2 to PDF
+      pdf.addPage([1200, 1700], 'portrait');
+      const imgData2 = canvas.toDataURL('image/jpeg', 0.95);
+      pdf.addImage(imgData2, 'JPEG', 0, 0, 1200, 1700);
+
+      // Save PDF Report
       const rawOrgName = localStorage.getItem('assetmanager_org_name') || 'AssetManager IT';
       const cleanOrgName = rawOrgName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9ก-๙_-]/g, '');
-      pdf.save(`${cleanOrgName}_Audit_Report_${asset.id}.pdf`);
+      pdf.save(`${cleanOrgName}_Compliance_Audit_Report_${asset.id}.pdf`);
 
-      triggerToast('success', `ส่งออกไฟล์รายงาน PDF ครุภัณฑ์รหัส ${asset.id} สำหรับหน่วยงาน ${rawOrgName} สำเร็จ`);
+      triggerToast('success', `ส่งออกไฟล์รายงาน PDF ครุภัณฑ์ตรวจสอบความถูกต้องแบบ 2 หน้า รหัส ${asset.id} สำเร็จ`);
     } catch (err) {
       console.error('PDF Export failed:', err);
       triggerToast('error', 'ไม่สามารถส่งออก PDF ได้ กรุณาลองใหม่อีกครั้ง');
@@ -857,13 +1299,17 @@ export default function AssetDetailsView({
             </div>
 
             {/* Quick specifications grid cards */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-1">
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex flex-col justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">CPU</span>
                 <p className="text-sm font-bold text-primary leading-tight truncate">{asset.specCPU || '-'}</p>
                 <span className="text-[9px] text-slate-400 font-medium">Processor</span>
               </div>
+            </div>
 
+
+
+            <div className="grid grid-cols-2 gap-1">
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex flex-col justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">RAM</span>
                 <p className="text-sm font-bold text-primary leading-tight truncate">{asset.specRAM || '-'}</p>
@@ -1404,7 +1850,7 @@ export default function AssetDetailsView({
                     <h4 className="text-xs font-bold text-primary border-b border-slate-100 pb-1">ข้อมูลการจัดซื้อและการเงิน</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-500 mb-1">ราคากลางจัดซื้อ (Purchase Price - บาท)</label>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">{`ราคากลางจัดซื้อ (Purchase Price - ${getCurrencySymbol(currency)})`}</label>
                         <input
                           type="number"
                           value={formPrice || ''}

@@ -14,6 +14,7 @@ interface TopbarProps {
   triggerToast: (type: 'success' | 'error' | 'info', message: string) => void;
   onToggleSidebar: () => void;
   user: UserSession;
+  orgName: string;
 }
 
 export default function Topbar({
@@ -27,19 +28,8 @@ export default function Topbar({
   triggerToast,
   onToggleSidebar,
   user,
+  orgName,
 }: TopbarProps) {
-  const [orgName, setOrgName] = useState(() => {
-    return localStorage.getItem('assetmanager_org_name') || 'AssetManager IT';
-  });
-
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setOrgName(localStorage.getItem('assetmanager_org_name') || 'AssetManager IT');
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [dismissedTicketIds, setDismissedTicketIds] = useState<string[]>([]);

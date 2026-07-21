@@ -12,6 +12,8 @@ export default function LoginPage({ onLogin, triggerToast }: LoginPageProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const orgName = localStorage.getItem('assetmanager_org_name') || 'AssetManager IT Solutions Ltd.';
+
   // Handle Real Google Sign-In via Popup
   const handleGoogleSignIn = async () => {
     setError('');
@@ -85,7 +87,7 @@ export default function LoginPage({ onLogin, triggerToast }: LoginPageProps) {
               <span className="p-1.5 bg-white/10 backdrop-blur-md rounded-lg">
                 <ShieldCheck className="w-6 h-6 text-sky-400" />
               </span>
-              <span className="font-bold text-lg tracking-wider">AssetManager IT</span>
+              <span className="font-bold text-lg tracking-wider truncate max-w-[200px]" title={orgName}>{orgName}</span>
             </div>
             <p className="text-xs text-sky-200/80 font-medium tracking-widest uppercase">Infrastructure Portal</p>
           </div>
@@ -113,7 +115,7 @@ export default function LoginPage({ onLogin, triggerToast }: LoginPageProps) {
               <span className="p-1.5 bg-[#00236f] rounded-lg">
                 <ShieldCheck className="w-5 h-5 text-sky-400" />
               </span>
-              <span className="font-bold text-sm text-[#00236f] tracking-wide">AssetManager IT</span>
+              <span className="font-bold text-sm text-[#00236f] tracking-wide truncate max-w-[150px]" title={orgName}>{orgName}</span>
             </div>
             <span className="text-[9px] font-bold bg-[#00236f]/5 text-[#00236f] px-2.5 py-1 rounded-full uppercase tracking-wider">
               Google Auth Active
@@ -125,6 +127,20 @@ export default function LoginPage({ onLogin, triggerToast }: LoginPageProps) {
             <div className="space-y-1 text-center md:text-left">
               <h3 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">ยินดีต้อนรับสู่ระบบ</h3>
               <p className="text-xs text-slate-400 font-medium">เข้าใช้งานระบบจัดการข้อมูลครุภัณฑ์ผ่าน GMAIL หรือ Google Account</p>
+            </div>
+
+            {/* Strict Access Disclaimer Banner */}
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl space-y-1 select-none">
+              <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                <ShieldCheck className="w-4.5 h-4.5 text-amber-600" />
+                <span>คำเตือนระบบความปลอดภัย (Security Warning)</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
+                อนุญาตให้เข้าใช้งานเฉพาะเจ้าหน้าที่ผู้ได้รับสิทธิ์และดูแลระบบ ICT เท่านั้น การพยายามเข้าใช้งานโดยไม่ได้รับอนุญาตเป็นความผิดตามกฎหมายคอมพิวเตอร์
+              </p>
+              <p className="text-[10px] text-slate-400 leading-normal font-medium">
+                Access to the login page is restricted to authorized individuals only; unauthorized access is not permitted.
+              </p>
             </div>
 
             {error && (

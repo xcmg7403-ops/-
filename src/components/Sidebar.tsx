@@ -9,6 +9,7 @@ interface SidebarProps {
   onLogout: () => void;
   isMobileOpen: boolean;
   onCloseMobile: () => void;
+  orgName?: string;
 }
 
 export default function Sidebar({ 
@@ -17,7 +18,8 @@ export default function Sidebar({
   user, 
   onLogout, 
   isMobileOpen, 
-  onCloseMobile 
+  onCloseMobile,
+  orgName
 }: SidebarProps) {
   
   const menuItems = [
@@ -56,9 +58,11 @@ export default function Sidebar({
       >
         {/* Brand Header */}
         <div className="mb-8 px-2 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold text-primary tracking-tight">AssetManager</h1>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">IT Infrastructure</p>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-primary tracking-tight truncate max-w-[170px]" title={orgName || 'AssetManager'}>
+              {orgName || 'AssetManager'}
+            </h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">IT Infrastructure</p>
           </div>
           {/* Close button for mobile */}
           <button 

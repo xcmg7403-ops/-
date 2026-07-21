@@ -126,6 +126,16 @@ export default function App() {
     return localStorage.getItem('assetmanager_currency') || 'THB (฿) - Thai Baht';
   });
 
+  // Organization Name State
+  const [orgName, setOrgName] = useState<string>(() => {
+    return localStorage.getItem('assetmanager_org_name') || 'AssetManager IT Solutions Ltd.';
+  });
+
+  // System Email State
+  const [systemEmail, setSystemEmail] = useState<string>(() => {
+    return localStorage.getItem('assetmanager_system_email') || 'admin@assetmanager.it';
+  });
+
   // Backup Schedule State
   const [backupSchedule, setBackupSchedule] = useState<string>(() => {
     return localStorage.getItem('assetmanager_backup_schedule') || 'Daily';
@@ -186,6 +196,11 @@ export default function App() {
     }
     localStorage.setItem('assetmanager_theme', theme);
   }, [theme]);
+
+  // Apply organization name to document title dynamically
+  useEffect(() => {
+    document.title = `${orgName} - ระบบบริหารจัดการครุภัณฑ์คอมพิวเตอร์`;
+  }, [orgName]);
 
   // Navigation and Selection States
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -462,6 +477,7 @@ export default function App() {
         onLogout={handleLogout}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        orgName={orgName}
       />
 
       {/* Main Content Area Viewport */}
@@ -478,6 +494,7 @@ export default function App() {
           triggerToast={triggerToast}
           onToggleSidebar={() => setIsMobileSidebarOpen(true)}
           user={user}
+          orgName={orgName}
         />
 
         {/* Dynamic routed workspace panel */}
@@ -506,6 +523,7 @@ export default function App() {
               onDeleteAsset={handleDeleteAsset}
               triggerToast={triggerToast}
               onImportAssets={handleImportAssets}
+              currency={currency}
             />
           )}
 
@@ -574,6 +592,10 @@ export default function App() {
               onTriggerManualBackup={handleManualBackup}
               onRestoreBackup={handleRestoreBackup}
               onDeleteBackup={handleDeleteBackup}
+              orgName={orgName}
+              onOrgNameChange={setOrgName}
+              systemEmail={systemEmail}
+              onSystemEmailChange={setSystemEmail}
             />
           )}
         </main>

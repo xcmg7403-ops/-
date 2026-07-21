@@ -37,6 +37,10 @@ interface SettingsViewProps {
   onTriggerManualBackup: () => Promise<void>;
   onRestoreBackup: (backup: BackupRecord) => Promise<void>;
   onDeleteBackup: (backupId: string) => Promise<void>;
+  orgName: string;
+  onOrgNameChange: (orgName: string) => void;
+  systemEmail: string;
+  onSystemEmailChange: (email: string) => void;
 }
 
 export default function SettingsView({ 
@@ -52,18 +56,25 @@ export default function SettingsView({
   isBackingUp,
   onTriggerManualBackup,
   onRestoreBackup,
-  onDeleteBackup
+  onDeleteBackup,
+  orgName,
+  onOrgNameChange,
+  systemEmail,
+  onSystemEmailChange
 }: SettingsViewProps) {
   
-  const [orgName, setOrganizationName] = useState(() => {
-    return localStorage.getItem('assetmanager_org_name') || 'AssetManager IT Solutions Ltd.';
-  });
-  const [systemEmail, setSystemEmail] = useState(() => {
-    return localStorage.getItem('assetmanager_system_email') || 'admin@assetmanager.it';
-  });
-  
+  const [localOrgName, setLocalOrgName] = useState(orgName);
+  const [localSystemEmail, setLocalSystemEmail] = useState(systemEmail);
   const [localCurrency, setLocalCurrency] = useState(currency);
   const [localBackupSchedule, setLocalBackupSchedule] = useState(backupSchedule);
+
+  useEffect(() => {
+    setLocalOrgName(orgName);
+  }, [orgName]);
+
+  useEffect(() => {
+    setLocalSystemEmail(systemEmail);
+  }, [systemEmail]);
 
   useEffect(() => {
     setLocalCurrency(currency);
@@ -84,11 +95,13 @@ export default function SettingsView({
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('assetmanager_org_name', orgName);
-    localStorage.setItem('assetmanager_system_email', systemEmail);
+    localStorage.setItem('assetmanager_org_name', localOrgName);
+    localStorage.setItem('assetmanager_system_email', localSystemEmail);
     localStorage.setItem('assetmanager_currency', localCurrency);
     localStorage.setItem('assetmanager_backup_schedule', localBackupSchedule);
     
+    onOrgNameChange(localOrgName);
+    onSystemEmailChange(localSystemEmail);
     onCurrencyChange(localCurrency);
     onBackupScheduleChange(localBackupSchedule);
     
@@ -154,8 +167,8 @@ export default function SettingsView({
               <input
                 type="text"
                 required
-                value={orgName}
-                onChange={(e) => setOrganizationName(e.target.value)}
+                value={localOrgName}
+                onChange={(e) => setLocalOrgName(e.target.value)}
                 className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-secondary/15"
               />
             </div>
@@ -168,8 +181,8 @@ export default function SettingsView({
               <input
                 type="email"
                 required
-                value={systemEmail}
-                onChange={(e) => setSystemEmail(e.target.value)}
+                value={localSystemEmail}
+                onChange={(e) => setLocalSystemEmail(e.target.value)}
                 className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-secondary/15"
               />
             </div>
