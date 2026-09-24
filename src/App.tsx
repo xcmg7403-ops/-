@@ -13,7 +13,7 @@ import LoginPage from './components/LoginPage';
 import AdminPortalView from './components/AdminPortalView';
 
 import { SEED_ASSETS, SEED_REPAIR_TICKETS, SEED_MAINTENANCE_EVENTS } from './mockData';
-import { Asset, RepairTicket, MaintenanceEvent, UserSession, BackupRecord } from './types';
+import { Asset, RepairTicket, MaintenanceEvent, UserSession, BackupRecord, MasterDataState } from './types';
 import { 
   getAssets, 
   saveAsset, 
@@ -27,7 +27,12 @@ import {
   getBackups,
   saveBackup,
   deleteBackup,
-  clearDatabase
+  clearDatabase,
+  getMasterData,
+  saveMasterData,
+  DEFAULT_MASTER_DATA,
+  DEFAULT_ADMIN_PERMISSIONS,
+  DEFAULT_USER_PERMISSIONS
 } from './lib/firebase';
 
 export default function App() {
@@ -61,7 +66,32 @@ export default function App() {
   // User auth session
   const [user, setUser] = useState<UserSession | null>(() => {
     const saved = localStorage.getItem('assetmanager_user');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          if (!parsed.permissions) {
+            parsed.permissions = parsed.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_USER_PERMISSIONS;
+          }
+          if (!parsed.username) {
+            parsed.username = parsed.email?.split('@')[0] || (parsed.role === 'admin' ? 'admin' : 'user');
+          }
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  // Master Data State
+  const [masterData, setMasterData] = useState<MasterDataState>(() => {
+    const saved = localStorage.getItem('assetmanager_master_data');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return DEFAULT_MASTER_DATA;
   });
 
   const [isLoadingFirebase, setIsLoadingFirebase] = useState(true);
@@ -76,14 +106,16 @@ export default function App() {
   const handleRefreshData = async () => {
     setIsRefreshing(true);
     try {
-      const [fbAssets, fbTickets, fbEvents] = await Promise.all([
+      const [fbAssets, fbTickets, fbEvents, fbMasterData] = await Promise.all([
         getAssets(),
         getRepairTickets(),
-        getMaintenanceEvents()
+        getMaintenanceEvents(),
+        getMasterData()
       ]);
       setAssets(fbAssets);
       setRepairTickets(fbTickets);
       setMaintenanceEvents(fbEvents);
+      if (fbMasterData) setMasterData(fbMasterData);
       const now = new Date();
       const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const dateString = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -101,16 +133,18 @@ export default function App() {
   useEffect(() => {
     async function loadFirebaseData() {
       try {
-        const [fbAssets, fbTickets, fbEvents, fbBackups] = await Promise.all([
+        const [fbAssets, fbTickets, fbEvents, fbBackups, fbMasterData] = await Promise.all([
           getAssets(),
           getRepairTickets(),
           getMaintenanceEvents(),
-          getBackups()
+          getBackups(),
+          getMasterData()
         ]);
         setAssets(fbAssets);
         setRepairTickets(fbTickets);
         setMaintenanceEvents(fbEvents);
         setBackups(fbBackups);
+        if (fbMasterData) setMasterData(fbMasterData);
         const now = new Date();
         const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const dateString = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -247,15 +281,22 @@ export default function App() {
   };
 
   // Auth Handlers
-  const handleLogin = (email: string, role: 'admin' | 'user', name: string, avatar?: string) => {
-    const session: UserSession = {
-      email,
-      role,
-      name,
-      avatar: avatar || (role === 'admin'
-        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
-        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces')
-    };
+  const handleLogin = (sessionOrEmail: UserSession | string, role?: 'admin' | 'user', name?: string, avatar?: string) => {
+    let session: UserSession;
+    if (typeof sessionOrEmail === 'string') {
+      session = {
+        email: sessionOrEmail,
+        role: role || 'user',
+        name: name || 'User',
+        avatar: avatar || (role === 'admin'
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces'),
+        username: sessionOrEmail.split('@')[0],
+        permissions: role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_USER_PERMISSIONS
+      };
+    } else {
+      session = sessionOrEmail;
+    }
     setUser(session);
     localStorage.setItem('assetmanager_user', JSON.stringify(session));
   };
@@ -468,7 +509,7 @@ export default function App() {
   // Render Login page if not authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen w-full flex items-center justify-center">
         <Toast toasts={toasts} onRemove={removeToast} />
         <LoginPage onLogin={handleLogin} triggerToast={triggerToast} />
       </div>
@@ -535,6 +576,8 @@ export default function App() {
               triggerToast={triggerToast}
               onImportAssets={handleImportAssets}
               currency={currency}
+              masterData={masterData}
+              currentUser={user}
             />
           )}
 
@@ -584,8 +627,17 @@ export default function App() {
 
           {activeTab === 'reports' && <ReportsView assets={assets} repairTickets={repairTickets} currency={currency} />}
 
-          {activeTab === 'admin' && user.role === 'admin' && (
-            <AdminPortalView assets={assets} triggerToast={triggerToast} />
+          {activeTab === 'admin' && (user.role === 'admin' || user.permissions?.canManageUsers || user.permissions?.canManageMasterData) && (
+            <AdminPortalView 
+              assets={assets} 
+              triggerToast={triggerToast} 
+              currentUser={user}
+              masterData={masterData}
+              onUpdateMasterData={(newMD) => {
+                setMasterData(newMD);
+                saveMasterData(newMD);
+              }}
+            />
           )}
 
           {activeTab === 'settings' && (

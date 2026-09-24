@@ -227,7 +227,7 @@ export default function Topbar({
 
         {/* Help Outlines */}
         <button
-          onClick={() => alert('คู่มือการใช้งาน: กรุณาติดต่อแผนกไอทีที่เบอร์ Ext. 101')}
+          onClick={() => triggerToast('info', 'คู่มือการใช้งาน: กรุณาติดต่อแผนกไอทีที่เบอร์ Ext. 101')}
           className="text-slate-400 hover:text-slate-700 hover:bg-slate-50 p-1.5 sm:p-2 rounded-full transition-all cursor-pointer hidden sm:block"
           title="ช่วยเหลือ"
         >

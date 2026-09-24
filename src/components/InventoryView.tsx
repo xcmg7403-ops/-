@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
-import { Asset, AssetCategory, AssetStatus, UserRecord } from '../types';
+import { Asset, AssetCategory, AssetStatus, UserRecord, MasterDataState, UserSession } from '../types';
 import { getUsers } from '../lib/firebase';
 import { getCurrencySymbol } from '../lib/currency';
 import {
@@ -49,6 +49,8 @@ interface InventoryViewProps {
   triggerToast: (type: 'success' | 'error' | 'info', message: string) => void;
   onImportAssets?: (assets: Asset[]) => void;
   currency?: string;
+  masterData?: MasterDataState;
+  currentUser?: UserSession;
 }
 
 export default function InventoryView({
@@ -59,7 +61,9 @@ export default function InventoryView({
   onDeleteAsset,
   triggerToast,
   onImportAssets,
-  currency = 'THB (฿) - Thai Baht'
+  currency = 'THB (฿) - Thai Baht',
+  masterData,
+  currentUser
 }: InventoryViewProps) {
   // Filters & State
   const [selectedCategory, setSelectedCategory] = useState<string>('ทั้งหมด');
@@ -161,26 +165,42 @@ export default function InventoryView({
   const [formLan, setFormLan] = useState('');
   const [formRemarks, setFormRemarks] = useState('');
 
-  // Category mapping for dropdown display
-  const categoriesMap: { [key: string]: string } = {
-    'ทั้งหมด': 'ทั้งหมด',
-    'PC': 'PC (คอมพิวเตอร์ตั้งโต๊ะ)',
-    'Notebook': 'Notebook (โน้ตบุ๊ก)',
-    'Office Furniture': 'เฟอร์นิเจอร์สำนักงาน',
-    'Electrical Appliances': 'เครื่องใช้ไฟฟ้า',
-    'Vehicles': 'ยานพาหนะ',
-    'Peripherals': 'อุปกรณ์ต่อพ่วง',
-    'Network': 'อุปกรณ์เครือข่าย',
-    'Server': 'เซิร์ฟเวอร์หลัก',
-    'Display': 'จอแสดงผล'
-  };
+  // Category mapping for dropdown display with Master Data support
+  const categoriesMap: { [key: string]: string } = useMemo(() => {
+    const base: { [key: string]: string } = {
+      'ทั้งหมด': 'ทั้งหมด',
+      'PC': 'PC (คอมพิวเตอร์ตั้งโต๊ะ)',
+      'Notebook': 'Notebook (โน้ตบุ๊ก)',
+      'Office Furniture': 'เฟอร์นิเจอร์สำนักงาน',
+      'Electrical Appliances': 'เครื่องใช้ไฟฟ้า',
+      'Vehicles': 'ยานพาหนะ',
+      'Peripherals': 'อุปกรณ์ต่อพ่วง',
+      'Network': 'อุปกรณ์เครือข่าย',
+      'Server': 'เซิร์ฟเวอร์หลัก',
+      'Display': 'จอแสดงผล'
+    };
+    if (masterData?.categories) {
+      masterData.categories.filter(c => c.isActive).forEach(c => {
+        base[c.code] = `${c.nameTh} (${c.nameEn || c.code})`;
+      });
+    }
+    return base;
+  }, [masterData]);
 
-  const statusMap: { [key: string]: string } = {
-    'ทุกสถานะ': 'ทุกสถานะ',
-    'In Use': 'In Use (กำลังใช้งาน)',
-    'Available': 'Available (ว่าง/พร้อมใช้)',
-    'Repair': 'Repair (รอซ่อม)'
-  };
+  const statusMap: { [key: string]: string } = useMemo(() => {
+    const base: { [key: string]: string } = {
+      'ทุกสถานะ': 'ทุกสถานะ',
+      'In Use': 'In Use (กำลังใช้งาน)',
+      'Available': 'Available (ว่าง/พร้อมใช้)',
+      'Repair': 'Repair (รอซ่อม)'
+    };
+    if (masterData?.statuses) {
+      masterData.statuses.filter(s => s.isActive).forEach(s => {
+        base[s.code] = `${s.nameTh} (${s.code})`;
+      });
+    }
+    return base;
+  }, [masterData]);
 
   // Open Add Modal
   const handleOpenAddModal = () => {

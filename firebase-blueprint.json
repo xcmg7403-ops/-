@@ -1,0 +1,142 @@
+{
+  "entities": {
+    "Asset": {
+      "title": "Asset",
+      "description": "IT hardware or software asset record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "assetCode": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "model": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "location": { "type": "string" },
+        "purchaseDate": { "type": "string" },
+        "price": { "type": "number" },
+        "vendor": { "type": "string" }
+      },
+      "required": ["id", "assetCode", "name", "category", "status"]
+    },
+    "RepairTicket": {
+      "title": "RepairTicket",
+      "description": "Maintenance and repair ticket for assets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ticketNumber": { "type": "string" },
+        "assetId": { "type": "string" },
+        "assetName": { "type": "string" },
+        "issue": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "dateSubmitted": { "type": "string" }
+      },
+      "required": ["id", "ticketNumber", "assetId", "issue", "status"]
+    },
+    "MaintenanceEvent": {
+      "title": "MaintenanceEvent",
+      "description": "Scheduled preventive maintenance calendar event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "month": { "type": "string" },
+        "day": { "type": "string" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "title", "month", "day", "time"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User account with role, credentials, and granular permissions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "department": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Suspended"] },
+        "lastLogin": { "type": "string" }
+      },
+      "required": ["id", "username", "name", "email", "role", "department", "status"]
+    },
+    "MasterData": {
+      "title": "MasterData",
+      "description": "Master data controls for categories, departments, locations, vendors, and statuses",
+      "type": "object",
+      "properties": {
+        "categories": { "type": "array" },
+        "departments": { "type": "array" },
+        "locations": { "type": "array" },
+        "vendors": { "type": "array" },
+        "statuses": { "type": "array" }
+      }
+    },
+    "Backup": {
+      "title": "Backup",
+      "description": "Database snapshot backup",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "schedule": { "type": "string" }
+      },
+      "required": ["id", "timestamp"]
+    },
+    "AccessRequest": {
+      "title": "AccessRequest",
+      "description": "Account registration request identified by username, employee ID, and department without email linkage",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "requestedRole": { "type": "string", "enum": ["admin", "user"] },
+        "department": { "type": "string" },
+        "reason": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "requestedAt": { "type": "string" }
+      },
+      "required": ["id", "username", "name", "requestedRole", "department", "status"]
+    }
+  },
+  "firestore": {
+    "/assets/{assetId}": {
+      "schema": { "$ref": "Asset" },
+      "description": "Enterprise IT Asset items catalog"
+    },
+    "/tickets/{ticketId}": {
+      "schema": { "$ref": "RepairTicket" },
+      "description": "Maintenance repair tickets"
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "MaintenanceEvent" },
+      "description": "Preventive maintenance events schedule"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "Authorized user accounts, credentials, and permissions"
+    },
+    "/access_requests/{requestId}": {
+      "schema": { "$ref": "AccessRequest" },
+      "description": "Account access requests decoupled from email"
+    },
+    "/master_data/{docId}": {
+      "schema": { "$ref": "MasterData" },
+      "description": "Enterprise master data taxonomy and lookup definitions"
+    },
+    "/backups/{backupId}": {
+      "schema": { "$ref": "Backup" },
+      "description": "Saved system backups"
+    }
+  }
+}

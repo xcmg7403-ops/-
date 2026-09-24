@@ -75,9 +75,15 @@ export default function QRScannerModal({
           cameraParam,
           {
             fps: 15,
-            qrbox: (width, height) => {
-              const size = Math.min(width, height) * 0.7;
-              return { width: size, height: size };
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              // Ensure positive, valid fallback values for dimensions
+              const width = typeof viewfinderWidth === 'number' && viewfinderWidth > 0 ? viewfinderWidth : 250;
+              const height = typeof viewfinderHeight === 'number' && viewfinderHeight > 0 ? viewfinderHeight : 250;
+              const minDimension = Math.min(width, height);
+              // Calculate 70% of the smaller dimension, but clamp to >= 50px (minimum enforced by html5-qrcode)
+              const calculatedSize = Math.floor(minDimension * 0.7);
+              const safeSize = Math.max(50, calculatedSize);
+              return { width: safeSize, height: safeSize };
             },
           },
           (decodedText) => {

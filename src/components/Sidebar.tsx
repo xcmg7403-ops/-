@@ -30,9 +30,10 @@ export default function Sidebar({
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  // Only display Admin Portal for admin role
-  if (user.role === 'admin') {
-    menuItems.push({ id: 'admin', label: 'Admin Portal', icon: ShieldAlert });
+  // Display Admin Portal for admin role OR users with permissions to manage users or master data
+  const canAccessAdmin = user.role === 'admin' || user.permissions?.canManageUsers || user.permissions?.canManageMasterData;
+  if (canAccessAdmin) {
+    menuItems.push({ id: 'admin', label: 'Admin & Master Data', icon: ShieldAlert });
   }
 
   const handleTabClick = (tabId: string) => {
@@ -107,8 +108,17 @@ export default function Sidebar({
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-slate-800 truncate leading-none mb-1">{user.name.split(' ')[0]}</p>
-              <p className="text-[10px] font-bold text-secondary uppercase tracking-wider">{user.role === 'admin' ? 'Admin Access' : 'IT Staff'}</p>
+              <p className="text-xs font-bold text-slate-800 truncate leading-none mb-1">
+                {user.name.split(' ')[0]}
+              </p>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-mono font-bold text-[#00236f] truncate">
+                  @{user.username || (user.role === 'admin' ? 'admin' : 'user')}
+                </span>
+                <span className="text-[9px] px-1 py-0.2 rounded bg-slate-100 text-slate-500 font-bold uppercase">
+                  {user.role === 'admin' ? 'Admin' : 'Staff'}
+                </span>
+              </div>
             </div>
             <button 
               title="ออกจากระบบ"

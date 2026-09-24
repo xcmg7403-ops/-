@@ -1,226 +1,248 @@
-import React, { useState } from 'react';
-import { Mail, LogIn, ShieldCheck, AlertCircle } from 'lucide-react';
-import { signInWithGoogle, directGmailLogin } from '../lib/firebase';
+import React, { useState, useEffect } from 'react';
+import {
+  User,
+  Lock,
+  Eye,
+  EyeOff,
+  Boxes,
+  AlertCircle,
+  CheckCircle2,
+  LogIn,
+  ShieldCheck,
+  Building2
+} from 'lucide-react';
+import { loginWithCredentials } from '../lib/firebase';
+import { UserSession } from '../types';
 
 interface LoginPageProps {
-  onLogin: (email: string, role: 'admin' | 'user', name: string, avatar: string) => void;
+  onLogin: (session: UserSession) => void;
   triggerToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 export default function LoginPage({ onLogin, triggerToast }: LoginPageProps) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const orgName = localStorage.getItem('assetmanager_org_name') || 'AssetManager IT Solutions Ltd.';
+  const orgName = localStorage.getItem('assetmanager_org_name') || 'IT Asset Management System';
 
-  // Handle Real Google Sign-In via Popup
-  const handleGoogleSignIn = async () => {
-    setError('');
-    setIsLoading(true);
-    try {
-      const userSession = await signInWithGoogle();
-      onLogin(userSession.email, userSession.role, userSession.name, userSession.avatar);
-      triggerToast('success', `ยินดีต้อนรับคุณ ${userSession.name} เข้าสู่ระบบเรียบร้อยแล้ว (${userSession.role === 'admin' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่'})`);
-    } catch (err: any) {
-      console.error("Google Sign-In failed:", err);
-      // Popup closed or authorization domain error
-      if (err?.code === 'auth/popup-closed-by-user') {
-        setError('การเชื่อมต่อถูกยกเลิกเนื่องจากหน้าต่างป๊อปอัปถูกปิด');
-        triggerToast('info', 'ยกเลิกการเข้าสู่ระบบ');
-      } else if (err?.code === 'auth/unauthorized-domain') {
-        setError('โดเมนนี้ยังไม่ได้รับการอนุมัติใน Firebase Console กรุณาใช้ช่องทางกรอกอีเมล Gmail โดยตรงด้านล่างเพื่อเข้าใช้งาน');
-        triggerToast('error', 'ข้อผิดพลาดโดเมนผู้ให้บริการ');
-      } else {
-        setError('ไม่สามารถลงชื่อเข้าใช้งานด้วย Google ได้ชั่วคราว กรุณาใช้ช่องทางกรอกอีเมล Gmail โดยตรงด้านล่างแทน');
-        triggerToast('error', 'การเชื่อมต่อผิดพลาด');
-      }
-    } finally {
-      setIsLoading(false);
+  // Load saved username if rememberMe was previously set
+  useEffect(() => {
+    const savedUser = localStorage.getItem('assetmanager_saved_username');
+    if (savedUser) {
+      setUsername(savedUser);
     }
-  };
+  }, []);
 
-  // Handle Direct Gmail Address login (Perfect for sandboxed iframe fallback or quick access)
-  const handleDirectGmailSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail) {
-      setError('กรุณากรอกอีเมล Gmail ของคุณ');
+    const trimmedUser = username.trim();
+    if (!trimmedUser) {
+      setError('กรุณากรอก Username');
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
-      setError('รูปแบบอีเมลไม่ถูกต้อง');
+    if (!password) {
+      setError('กรุณากรอก Password');
       return;
     }
 
     setIsLoading(true);
+
     try {
-      // Simulate brief network delay for realism and smooth feedback
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      const userSession = await directGmailLogin(trimmedEmail);
-      onLogin(userSession.email, userSession.role, userSession.name, userSession.avatar);
-      triggerToast('success', `เข้าสู่ระบบด้วย Gmail เรียบร้อยแล้ว ในฐานะ ${userSession.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'เจ้าหน้าที่ (User)'}`);
-    } catch (err) {
-      console.error("Direct login failed:", err);
-      setError('เกิดข้อผิดพลาดในการตรวจสอบบัญชี');
+      // Simulate quick secure handshake
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
+      const userSession = await loginWithCredentials(trimmedUser, password);
+
+      if (rememberMe) {
+        localStorage.setItem('assetmanager_saved_username', trimmedUser);
+      } else {
+        localStorage.removeItem('assetmanager_saved_username');
+      }
+
+      onLogin(userSession);
+      triggerToast(
+        'success',
+        `เข้าสู่ระบบสำเร็จ: ${userSession.name} (${userSession.role === 'admin' ? 'ผู้ดูแลระบบ Admin' : 'เจ้าหน้าที่ Staff'})`
+      );
+    } catch (err: any) {
+      console.error('Login error:', err);
+      const msg = err?.message || 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง';
+      setError(msg);
+      triggerToast('error', msg);
     } finally {
       setIsLoading(false);
     }
   };
 
+
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans">
-      <div id="login-container" className="bg-white w-full max-w-4xl rounded-3xl shadow-xl border border-slate-100 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[500px] animate-in fade-in zoom-in-95 duration-300">
-        
-        {/* Left Column: Visual Branding Banner (Hidden on mobile) */}
-        <div className="hidden md:flex md:col-span-5 bg-[#00236f] p-8 flex-col justify-between text-white relative overflow-hidden">
-          {/* Background Decorative Circles */}
-          <div className="absolute -top-12 -left-12 w-48 h-48 bg-sky-400/10 rounded-full blur-2xl"></div>
-          <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 bg-white/10 backdrop-blur-md rounded-lg">
-                <ShieldCheck className="w-6 h-6 text-sky-400" />
-              </span>
-              <span className="font-bold text-lg tracking-wider truncate max-w-[200px]" title={orgName}>{orgName}</span>
-            </div>
-            <p className="text-xs text-sky-200/80 font-medium tracking-widest uppercase">Infrastructure Portal</p>
+    <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center p-4 font-sans text-slate-800">
+      {/* Centered Login Card */}
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200/80 p-8 sm:p-10 transition-all">
+        {/* Header / Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-white shadow-lg shadow-primary/25 mb-4">
+            <Boxes className="w-7 h-7" />
           </div>
-
-          <div className="space-y-4 my-8">
-            <h2 className="text-2xl font-bold font-sans tracking-tight leading-snug">
-              ระบบสแกนและบริหารจัดการครุภัณฑ์คอมพิวเตอร์ระดับองค์กร
-            </h2>
-            <p className="text-xs text-slate-300 leading-relaxed font-light">
-              อำนวยความสะดวกในการขึ้นทะเบียน, ติดตามการใช้งาน, ตรวจสอบสภาพด้วยระบบ QR Code สแกนเนอร์ด่วน และจัดทำรายงานวิเคราะห์ความเสี่ยงครบวงจร
-            </p>
-          </div>
-
-          <div className="border-t border-white/10 pt-4">
-            <p className="text-[10px] text-slate-400">© {new Date().getFullYear()} Enterprise IT Infrastructure. All rights reserved.</p>
-          </div>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight mb-1" title={orgName}>
+            {orgName}
+          </h1>
+          <p className="text-xs text-slate-500 font-medium">
+            กรุณากรอก Username และ Password เพื่อเข้าสู่ระบบ
+          </p>
         </div>
 
-        {/* Right Column: Interactive Login Form */}
-        <div className="col-span-12 md:col-span-7 p-6 sm:p-10 md:p-12 flex flex-col justify-center">
-          
-          {/* Header Mobile Support Branding */}
-          <div className="md:hidden flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-[#00236f] rounded-lg">
-                <ShieldCheck className="w-5 h-5 text-sky-400" />
-              </span>
-              <span className="font-bold text-sm text-[#00236f] tracking-wide truncate max-w-[150px]" title={orgName}>{orgName}</span>
+        {/* Error Alert */}
+        {error && (
+          <div className="mb-6 p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-3 text-xs text-rose-700 animate-in fade-in duration-200">
+            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+            <span className="leading-snug">{error}</span>
+          </div>
+        )}
+
+        {/* Standard Login Form: Only Username and Password */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Username Field */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700">
+              Username <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <User className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                id="login-username"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setError('');
+                }}
+                placeholder="ป้อน Username (เช่น admin หรือ user)"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                autoComplete="username"
+                required
+                disabled={isLoading}
+              />
             </div>
-            <span className="text-[9px] font-bold bg-[#00236f]/5 text-[#00236f] px-2.5 py-1 rounded-full uppercase tracking-wider">
-              Google Auth Active
+          </div>
+
+          {/* Password Field */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-700">
+                Password <span className="text-rose-500">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => triggerToast('info', 'หากลืมรหัสผ่าน กรุณาติดต่อผู้ดูแลระบบ (IT Administrator)')}
+                className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+              >
+                ลืมรหัสผ่าน?
+              </button>
+            </div>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Lock className="w-4 h-4" />
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="login-password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError('');
+                }}
+                placeholder="ป้อน Password"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                autoComplete="current-password"
+                required
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Remember Me Checkbox */}
+          <div className="flex items-center justify-between pt-1">
+            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary accent-primary cursor-pointer"
+              />
+              <span>จดจำการเข้าสู่ระบบ</span>
+            </label>
+            <span className="text-[11px] text-slate-400 flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span>ระบบปลอดภัย</span>
             </span>
           </div>
 
-          {/* Form Content */}
-          <div className="space-y-6">
-            <div className="space-y-1 text-center md:text-left">
-              <h3 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">ยินดีต้อนรับสู่ระบบ</h3>
-              <p className="text-xs text-slate-400 font-medium">เข้าใช้งานระบบจัดการข้อมูลครุภัณฑ์ผ่าน GMAIL หรือ Google Account</p>
-            </div>
-
-            {/* Strict Access Disclaimer Banner */}
-            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl space-y-1 select-none">
-              <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
-                <ShieldCheck className="w-4.5 h-4.5 text-amber-600" />
-                <span>คำเตือนระบบความปลอดภัย (Security Warning)</span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
-                อนุญาตให้เข้าใช้งานเฉพาะเจ้าหน้าที่ผู้ได้รับสิทธิ์และดูแลระบบ ICT เท่านั้น การพยายามเข้าใช้งานโดยไม่ได้รับอนุญาตเป็นความผิดตามกฎหมายคอมพิวเตอร์
-              </p>
-              <p className="text-[10px] text-slate-400 leading-normal font-medium">
-                Access to the login page is restricted to authorized individuals only; unauthorized access is not permitted.
-              </p>
-            </div>
-
-            {error && (
-              <div className="p-3 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 flex items-start gap-2.5 text-xs animate-shake">
-                <AlertCircle className="w-4.5 h-4.5 shrink-0 mt-0.5 text-rose-500" />
-                <span className="font-medium leading-relaxed">{error}</span>
-              </div>
+          {/* Submit Button */}
+          <button
+            type="submit"
+            id="btn-login-submit"
+            disabled={isLoading}
+            className="w-full py-3 px-4 bg-primary hover:bg-primary-container text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all duration-150 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                <span>กำลังเข้าสู่ระบบ...</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" />
+                <span>เข้าสู่ระบบ (Sign In)</span>
+              </>
             )}
+          </button>
+        </form>
 
-            {/* PRIMARY OPTION: Real Google Sign-In Button */}
-            <div className="space-y-3">
-              <button
-                type="button"
-                id="btn-google-signin"
-                disabled={isLoading}
-                onClick={handleGoogleSignIn}
-                className="w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs border border-slate-200 hover:border-slate-300 rounded-xl flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
-              >
-                {/* Official Google Icon */}
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-                </svg>
-                <span>ลงชื่อเข้าใช้ด้วย Google / GMAIL</span>
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-slate-100"></div>
-              <span className="flex-shrink mx-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-white px-2">หรือใช้ทางเลือกลงทะเบียนด่วน</span>
-              <div className="flex-grow border-t border-slate-100"></div>
-            </div>
-
-            {/* FALLBACK OPTION: Direct Gmail Sign-In Input */}
-            <form onSubmit={handleDirectGmailSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  กรอกอีเมล Gmail ของคุณโดยตรง
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setError('');
-                    }}
-                    placeholder="example@gmail.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#00236f]/20 focus:border-[#00236f] transition-all"
-                    required
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 leading-normal">
-                  * หากระบบหน้าต่างป๊อปอัปของ Google โดนบล็อกในเบราว์เซอร์ของคุณ ท่านสามารถพิมพ์ Gmail และกดเข้าใช้งานผ่านปุ่มด้านล่างนี้ได้ทันที
-                </p>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                id="btn-direct-login"
-                disabled={isLoading}
-                className="w-full bg-[#00236f] hover:bg-primary text-white text-xs font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer disabled:opacity-75 disabled:cursor-wait"
-              >
-                {isLoading ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                ) : (
-                  <>
-                    <LogIn className="w-4 h-4" />
-                    <span>เข้าสู่ระบบด้วย Gmail ทันที</span>
-                  </>
-                )}
-              </button>
-            </form>
+        {/* Quick Testing Hint */}
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+          <p className="text-[11px] text-slate-400 mb-2">เข้าใช้งานทดสอบระบบ:</p>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('admin');
+                setPassword('password123');
+                setError('');
+              }}
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-mono font-medium transition-colors cursor-pointer"
+            >
+              admin (ผู้ดูแลระบบ)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('user');
+                setPassword('password123');
+                setError('');
+              }}
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-mono font-medium transition-colors cursor-pointer"
+            >
+              user (เจ้าหน้าที่)
+            </button>
           </div>
-
         </div>
       </div>
     </div>

@@ -80,20 +80,106 @@ export interface MaintenanceEvent {
   fullDate?: string; // YYYY-MM-DD
 }
 
+export interface UserPermissions {
+  canManageUsers: boolean;
+  canManageMasterData: boolean;
+  canManageAssets: boolean;
+  canManageRepairs: boolean;
+  canExportReports: boolean;
+  canConfigureSystem: boolean;
+}
+
 export interface UserSession {
-  email: string;
+  username?: string;
+  email?: string;
   name: string;
   role: 'admin' | 'user';
   avatar: string;
+  department?: string;
+  permissions?: UserPermissions;
 }
 
 export interface UserRecord {
   id: string;
+  username: string;
+  password?: string;
   name: string;
-  email: string;
+  employeeId?: string;
+  email?: string;
   role: 'admin' | 'user';
   department: string;
   status: 'Active' | 'Suspended';
+  permissions: UserPermissions;
+  lastLogin?: string;
+}
+
+export interface AccessRequest {
+  id: string;
+  username: string; // Requested username (e.g. chayada.p, sompoch.r)
+  name: string; // Full Name
+  employeeId?: string; // Employee ID (e.g. EMP-1049)
+  requestedRole: 'admin' | 'user';
+  department: string;
+  reason?: string; // Purpose of access request
+  phone?: string; // Internal phone/extension (not email)
+  email?: string; // Optional legacy
+  requestedAt: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+}
+
+export interface MasterCategory {
+  id: string;
+  code: string;
+  nameTh: string;
+  nameEn: string;
+  icon?: string;
+  description?: string;
+  isActive: boolean;
+}
+
+export interface MasterDepartment {
+  id: string;
+  code: string;
+  name: string;
+  headName?: string;
+  isActive: boolean;
+}
+
+export interface MasterLocation {
+  id: string;
+  code: string;
+  name: string;
+  building: string;
+  floor: string;
+  isActive: boolean;
+}
+
+export interface MasterVendor {
+  id: string;
+  code: string;
+  name: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  isActive: boolean;
+}
+
+export interface MasterStatus {
+  id: string;
+  code: string;
+  nameTh: string;
+  nameEn: string;
+  color: string;
+  allowAssign: boolean;
+  isActive: boolean;
+}
+
+export interface MasterDataState {
+  categories: MasterCategory[];
+  departments: MasterDepartment[];
+  locations: MasterLocation[];
+  vendors: MasterVendor[];
+  statuses: MasterStatus[];
 }
 
 export interface BackupRecord {
@@ -104,4 +190,5 @@ export interface BackupRecord {
   repairTickets: RepairTicket[];
   maintenanceEvents: MaintenanceEvent[];
 }
+
 
