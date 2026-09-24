@@ -221,11 +221,22 @@ export async function getAssets(): Promise<Asset[]> {
   try {
     const querySnapshot = await getDocs(collection(db, ASSETS_COL));
     if (querySnapshot.empty) {
-      return [];
+      const batch = writeBatch(db);
+      for (const a of SEED_ASSETS) {
+        const docRef = doc(db, ASSETS_COL, a.id);
+        batch.set(docRef, cleanUndefined(a));
+      }
+      await batch.commit();
+      return SEED_ASSETS;
     }
     const list: Asset[] = [];
+    const seen = new Set<string>();
     querySnapshot.forEach((docSnap) => {
-      list.push(docSnap.data() as Asset);
+      const data = docSnap.data() as Asset;
+      if (data && data.id && !seen.has(data.id)) {
+        seen.add(data.id);
+        list.push(data);
+      }
     });
     return list;
   } catch (error) {
@@ -264,11 +275,22 @@ export async function getRepairTickets(): Promise<RepairTicket[]> {
   try {
     const querySnapshot = await getDocs(collection(db, TICKETS_COL));
     if (querySnapshot.empty) {
-      return [];
+      const batch = writeBatch(db);
+      for (const t of SEED_REPAIR_TICKETS) {
+        const docRef = doc(db, TICKETS_COL, t.id);
+        batch.set(docRef, cleanUndefined(t));
+      }
+      await batch.commit();
+      return SEED_REPAIR_TICKETS;
     }
     const list: RepairTicket[] = [];
+    const seen = new Set<string>();
     querySnapshot.forEach((docSnap) => {
-      list.push(docSnap.data() as RepairTicket);
+      const data = docSnap.data() as RepairTicket;
+      if (data && data.id && !seen.has(data.id)) {
+        seen.add(data.id);
+        list.push(data);
+      }
     });
     return list;
   } catch (error) {
@@ -307,11 +329,22 @@ export async function getMaintenanceEvents(): Promise<MaintenanceEvent[]> {
   try {
     const querySnapshot = await getDocs(collection(db, EVENTS_COL));
     if (querySnapshot.empty) {
-      return [];
+      const batch = writeBatch(db);
+      for (const e of SEED_MAINTENANCE_EVENTS) {
+        const docRef = doc(db, EVENTS_COL, e.id);
+        batch.set(docRef, cleanUndefined(e));
+      }
+      await batch.commit();
+      return SEED_MAINTENANCE_EVENTS;
     }
     const list: MaintenanceEvent[] = [];
+    const seen = new Set<string>();
     querySnapshot.forEach((docSnap) => {
-      list.push(docSnap.data() as MaintenanceEvent);
+      const data = docSnap.data() as MaintenanceEvent;
+      if (data && data.id && !seen.has(data.id)) {
+        seen.add(data.id);
+        list.push(data);
+      }
     });
     return list;
   } catch (error) {
@@ -360,8 +393,13 @@ export async function getUsers(): Promise<UserRecord[]> {
       return DEFAULT_USERS;
     }
     const list: UserRecord[] = [];
+    const seen = new Set<string>();
     querySnapshot.forEach((docSnap) => {
-      list.push(docSnap.data() as UserRecord);
+      const data = docSnap.data() as UserRecord;
+      if (data && data.id && !seen.has(data.id)) {
+        seen.add(data.id);
+        list.push(data);
+      }
     });
     return list;
   } catch (error) {

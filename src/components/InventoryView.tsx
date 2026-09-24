@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
-import { Asset, AssetCategory, AssetStatus } from '../types';
+import { Asset, AssetCategory, AssetStatus, UserRecord } from '../types';
+import { getUsers } from '../lib/firebase';
 import { getCurrencySymbol } from '../lib/currency';
 import {
   Search,
@@ -28,7 +29,14 @@ import {
   Download,
   CheckSquare,
   Square,
-  X
+  X,
+  UserPlus,
+  ArrowLeftRight,
+  AlertTriangle,
+  User,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import QRScannerModal from './QRScannerModal';
 
@@ -60,6 +68,21 @@ export default function InventoryView({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // Sorting state - Asset IDs can be sorted numerically
+  const [sortField, setSortField] = useState<'id' | 'name' | 'serialNumber' | 'category' | 'department' | 'status' | 'purchasePrice' | 'warrantyExpiryDate'>('id');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Handle column header clicks to toggle sort
+  const handleSort = (field: 'id' | 'name' | 'serialNumber' | 'category' | 'department' | 'status' | 'purchasePrice' | 'warrantyExpiryDate') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'purchasePrice' ? 'desc' : 'asc');
+    }
+    setCurrentPage(1);
+  };
+
   // Multi-Selection and QR Code Sticker Generator states
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -85,6 +108,29 @@ export default function InventoryView({
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+
+  // Bulk Actions State
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
+  const [systemUsers, setSystemUsers] = useState<UserRecord[]>([]);
+  const [selectedBulkUser, setSelectedBulkUser] = useState<string>(''); // user email or "custom"
+  const [bulkAssigneeName, setBulkAssigneeName] = useState('');
+  const [bulkAssigneeEmail, setBulkAssigneeEmail] = useState('');
+  const [bulkAssigneeDept, setBulkAssigneeDept] = useState('');
+  const [bulkAssigneeRole, setBulkAssigneeRole] = useState('Staff');
+  const [bulkAssigneeLocation, setBulkAssigneeLocation] = useState('HQ Bangkok');
+  const [bulkAssigneePhone, setBulkAssigneePhone] = useState('02-123-4567');
+  const [bulkActionType, setBulkActionType] = useState<'assign' | 'return' | 'repair'>('assign');
+
+  useEffect(() => {
+    getUsers()
+      .then((users) => {
+        setSystemUsers(users || []);
+      })
+      .catch((err) => {
+        console.error("Error loading system users:", err);
+      });
+  }, []);
 
   // Form Fields State
   const [formId, setFormId] = useState('');
@@ -254,9 +300,98 @@ export default function InventoryView({
     setIsFormOpen(false);
   };
 
-  // Filter Logic
+  // Bulk Actions Handlers
+  const handleExecuteBulkDelete = () => {
+    if (selectedAssetIds.length === 0) return;
+    
+    // Call onDeleteAsset for each selected ID
+    selectedAssetIds.forEach(id => {
+      onDeleteAsset(id);
+    });
+    
+    triggerToast('success', `ลบครุภัณฑ์ที่เลือกทั้งหมด ${selectedAssetIds.length} รายการเรียบร้อยแล้ว`);
+    setSelectedAssetIds([]);
+    setIsBulkDeleteOpen(false);
+  };
+
+  const handleExecuteBulkAssign = () => {
+    if (selectedAssetIds.length === 0) return;
+
+    selectedAssetIds.forEach(id => {
+      const asset = assets.find(a => a.id === id);
+      if (!asset) return;
+
+      const updatedAsset = { ...asset };
+
+      if (bulkActionType === 'assign') {
+        updatedAsset.status = 'In Use';
+        updatedAsset.responsiblePerson = bulkAssigneeName || undefined;
+        if (bulkAssigneeName.trim()) {
+          updatedAsset.assignee = {
+            name: bulkAssigneeName,
+            email: bulkAssigneeEmail || '-',
+            department: bulkAssigneeDept || '-',
+            role: bulkAssigneeRole || 'Staff',
+            location: bulkAssigneeLocation || 'HQ',
+            phone: bulkAssigneePhone || '-',
+            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face'
+          };
+        }
+      } else if (bulkActionType === 'return') {
+        updatedAsset.status = 'Available';
+        updatedAsset.responsiblePerson = undefined;
+        updatedAsset.assignee = undefined;
+      } else if (bulkActionType === 'repair') {
+        updatedAsset.status = 'Repair';
+      }
+
+      onEditAsset(updatedAsset);
+    });
+
+    if (bulkActionType === 'assign') {
+      triggerToast('success', `มอบหมายสิทธิ์ครุภัณฑ์ ${selectedAssetIds.length} รายการให้คุณ ${bulkAssigneeName} เรียบร้อยแล้ว`);
+    } else if (bulkActionType === 'return') {
+      triggerToast('success', `คืนครุภัณฑ์คลังกลางสำเร็จจำนวน ${selectedAssetIds.length} รายการ`);
+    } else {
+      triggerToast('success', `เปลี่ยนสถานะเป็นส่งซ่อมสำเร็จจำนวน ${selectedAssetIds.length} รายการ`);
+    }
+
+    setSelectedAssetIds([]);
+    setIsBulkAssignOpen(false);
+  };
+
+  const handleBulkUserSelectChange = (email: string) => {
+    setSelectedBulkUser(email);
+    if (email === 'custom' || !email) {
+      setBulkAssigneeName('');
+      setBulkAssigneeEmail('');
+      setBulkAssigneeDept('');
+      setBulkAssigneeRole('Staff');
+    } else {
+      const user = systemUsers.find(u => u.email === email);
+      if (user) {
+        setBulkAssigneeName(user.name);
+        setBulkAssigneeEmail(user.email);
+        setBulkAssigneeDept(user.department);
+        setBulkAssigneeRole(user.role === 'admin' ? 'ICT Administrator' : 'Staff');
+      }
+    }
+  };
+
+  // Natural numerical comparator for Asset IDs (e.g. AST-1, AST-2, AST-10, AST-2024-001)
+  const compareAssetIdsNumerically = (idA: string, idB: string, direction: 'asc' | 'desc' = 'asc'): number => {
+    const a = (idA || '').trim();
+    const b = (idB || '').trim();
+
+    // Natural numeric collation splits tokens and compares numeric parts as numbers
+    const cmp = a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    const finalCmp = cmp !== 0 ? cmp : a.localeCompare(b);
+    return direction === 'asc' ? finalCmp : -finalCmp;
+  };
+
+  // Filter & Sort Logic
   const filteredAssets = useMemo(() => {
-    return assets.filter((asset) => {
+    const filtered = assets.filter((asset) => {
       // 1. Category Filter
       if (selectedCategory !== 'ทั้งหมด') {
         const engCategory = Object.keys(categoriesMap).find(
@@ -286,7 +421,36 @@ export default function InventoryView({
 
       return true;
     });
-  }, [assets, selectedCategory, selectedStatus, localSearchQuery]);
+
+    // Numerical sort on Asset IDs and sorting for other columns
+    return [...filtered].sort((a, b) => {
+      if (sortField === 'id') {
+        return compareAssetIdsNumerically(a.id, b.id, sortDirection);
+      } else if (sortField === 'name') {
+        const cmp = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+        return sortDirection === 'asc' ? cmp : -cmp;
+      } else if (sortField === 'serialNumber') {
+        const cmp = (a.serialNumber || '').localeCompare(b.serialNumber || '', undefined, { numeric: true, sensitivity: 'base' });
+        return sortDirection === 'asc' ? cmp : -cmp;
+      } else if (sortField === 'category') {
+        const cmp = (a.category || '').localeCompare(b.category || '');
+        return sortDirection === 'asc' ? cmp : -cmp;
+      } else if (sortField === 'department') {
+        const cmp = (a.department || '').localeCompare(b.department || '');
+        return sortDirection === 'asc' ? cmp : -cmp;
+      } else if (sortField === 'status') {
+        const cmp = (a.status || '').localeCompare(b.status || '');
+        return sortDirection === 'asc' ? cmp : -cmp;
+      } else if (sortField === 'warrantyExpiryDate') {
+        const cmp = (a.warrantyExpiryDate || '').localeCompare(b.warrantyExpiryDate || '');
+        return sortDirection === 'asc' ? cmp : -cmp;
+      } else if (sortField === 'purchasePrice') {
+        const cmp = (a.purchasePrice || 0) - (b.purchasePrice || 0);
+        return sortDirection === 'asc' ? cmp : -cmp;
+      }
+      return 0;
+    });
+  }, [assets, selectedCategory, selectedStatus, localSearchQuery, sortField, sortDirection]);
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredAssets.length / itemsPerPage) || 1;
@@ -977,6 +1141,34 @@ export default function InventoryView({
               </div>
             </div>
 
+            {/* Sort Select */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-400">เรียงลำดับ:</span>
+              <div className="relative">
+                <select
+                  value={`${sortField}-${sortDirection}`}
+                  onChange={(e) => {
+                    const [field, dir] = e.target.value.split('-') as ['id' | 'name' | 'serialNumber' | 'category' | 'department' | 'status' | 'purchasePrice' | 'warrantyExpiryDate', 'asc' | 'desc'];
+                    setSortField(field);
+                    setSortDirection(dir);
+                    setCurrentPage(1);
+                  }}
+                  className="appearance-none bg-white border border-slate-200 rounded-xl pl-3 pr-8 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-secondary/15 focus:border-secondary cursor-pointer"
+                >
+                  <option value="id-asc">🔢 Asset ID (เรียงตัวเลข 1 → 9)</option>
+                  <option value="id-desc">🔢 Asset ID (เรียงตัวเลข 9 → 1)</option>
+                  <option value="name-asc">🔤 ชื่อสินทรัพย์ (ก-ฮ / A-Z)</option>
+                  <option value="name-desc">🔤 ชื่อสินทรัพย์ (ฮ-ก / Z-A)</option>
+                  <option value="serialNumber-asc">🏷️ Serial Number (น้อย → มาก)</option>
+                  <option value="purchasePrice-desc">💰 ราคาจัดซื้อ (มาก → น้อย)</option>
+                  <option value="purchasePrice-asc">💰 ราคาจัดซื้อ (น้อย → มาก)</option>
+                  <option value="warrantyExpiryDate-asc">📅 วันหมดประกัน (ใกล้หมดก่อน)</option>
+                  <option value="status-asc">📊 สถานะ (Status)</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
             {/* Local Search for rapid reactivity */}
             <div className="flex items-center gap-1.5">
               <div className="relative w-48">
@@ -1056,13 +1248,150 @@ export default function InventoryView({
                     className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary accent-primary cursor-pointer"
                   />
                 </th>
-                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">Asset ID</th>
-                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">ชื่อสินทรัพย์</th>
-                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">Serial Number</th>
-                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">หมวดหมู่</th>
-                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">แผนก / ที่ตั้ง</th>
-                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">สถานะ</th>
-                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider">วันสิ้นสุดประกัน</th>
+                {/* Asset ID - Sortable numerically */}
+                <th 
+                  onClick={() => handleSort('id')}
+                  className="px-6 py-3 text-xs font-bold uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100/70 transition-colors group"
+                  title="คลิกเพื่อเรียงตามรหัสครุภัณฑ์ (เรียงตามตัวเลข Numerical Sort)"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'id' ? 'text-primary font-black' : 'group-hover:text-slate-700'}>Asset ID</span>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-colors ${
+                      sortField === 'id' ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-slate-100 text-slate-400 group-hover:text-slate-600'
+                    }`}>
+                      {sortField === 'id' ? (sortDirection === 'asc' ? '1→9' : '9→1') : '123'}
+                    </span>
+                    {sortField === 'id' ? (
+                      sortDirection === 'asc' ? (
+                        <ArrowUp className="w-3.5 h-3.5 text-primary shrink-0" />
+                      ) : (
+                        <ArrowDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0 transition-colors" />
+                    )}
+                  </div>
+                </th>
+
+                {/* Asset Name - Sortable */}
+                <th 
+                  onClick={() => handleSort('name')}
+                  className="px-6 py-3 text-xs font-bold uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100/70 transition-colors group"
+                  title="คลิกเพื่อเรียงตามชื่อสินทรัพย์"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'name' ? 'text-primary font-black' : 'group-hover:text-slate-700'}>ชื่อสินทรัพย์</span>
+                    {sortField === 'name' ? (
+                      sortDirection === 'asc' ? (
+                        <ArrowUp className="w-3.5 h-3.5 text-primary shrink-0" />
+                      ) : (
+                        <ArrowDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0 transition-colors" />
+                    )}
+                  </div>
+                </th>
+
+                {/* Serial Number - Sortable */}
+                <th 
+                  onClick={() => handleSort('serialNumber')}
+                  className="px-6 py-3 text-xs font-bold uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100/70 transition-colors group"
+                  title="คลิกเพื่อเรียงตาม Serial Number"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'serialNumber' ? 'text-primary font-black' : 'group-hover:text-slate-700'}>Serial Number</span>
+                    {sortField === 'serialNumber' ? (
+                      sortDirection === 'asc' ? (
+                        <ArrowUp className="w-3.5 h-3.5 text-primary shrink-0" />
+                      ) : (
+                        <ArrowDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0 transition-colors" />
+                    )}
+                  </div>
+                </th>
+
+                {/* Category - Sortable */}
+                <th 
+                  onClick={() => handleSort('category')}
+                  className="px-6 py-3 text-xs font-bold uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100/70 transition-colors group"
+                  title="คลิกเพื่อเรียงตามหมวดหมู่"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'category' ? 'text-primary font-black' : 'group-hover:text-slate-700'}>หมวดหมู่</span>
+                    {sortField === 'category' ? (
+                      sortDirection === 'asc' ? (
+                        <ArrowUp className="w-3.5 h-3.5 text-primary shrink-0" />
+                      ) : (
+                        <ArrowDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0 transition-colors" />
+                    )}
+                  </div>
+                </th>
+
+                {/* Department - Sortable */}
+                <th 
+                  onClick={() => handleSort('department')}
+                  className="px-6 py-3 text-xs font-bold uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100/70 transition-colors group"
+                  title="คลิกเพื่อเรียงตามแผนก / ที่ตั้ง"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'department' ? 'text-primary font-black' : 'group-hover:text-slate-700'}>แผนก / ที่ตั้ง</span>
+                    {sortField === 'department' ? (
+                      sortDirection === 'asc' ? (
+                        <ArrowUp className="w-3.5 h-3.5 text-primary shrink-0" />
+                      ) : (
+                        <ArrowDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0 transition-colors" />
+                    )}
+                  </div>
+                </th>
+
+                {/* Status - Sortable */}
+                <th 
+                  onClick={() => handleSort('status')}
+                  className="px-6 py-3 text-xs font-bold uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100/70 transition-colors group"
+                  title="คลิกเพื่อเรียงตามสถานะ"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'status' ? 'text-primary font-black' : 'group-hover:text-slate-700'}>สถานะ</span>
+                    {sortField === 'status' ? (
+                      sortDirection === 'asc' ? (
+                        <ArrowUp className="w-3.5 h-3.5 text-primary shrink-0" />
+                      ) : (
+                        <ArrowDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0 transition-colors" />
+                    )}
+                  </div>
+                </th>
+
+                {/* Warranty Expiry - Sortable */}
+                <th 
+                  onClick={() => handleSort('warrantyExpiryDate')}
+                  className="px-6 py-3 text-xs font-bold uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100/70 transition-colors group"
+                  title="คลิกเพื่อเรียงตามวันสิ้นสุดประกัน"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'warrantyExpiryDate' ? 'text-primary font-black' : 'group-hover:text-slate-700'}>วันสิ้นสุดประกัน</span>
+                    {sortField === 'warrantyExpiryDate' ? (
+                      sortDirection === 'asc' ? (
+                        <ArrowUp className="w-3.5 h-3.5 text-primary shrink-0" />
+                      ) : (
+                        <ArrowDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0 transition-colors" />
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-center">จัดการ</th>
               </tr>
             </thead>
@@ -1720,36 +2049,354 @@ export default function InventoryView({
 
       {/* 1. FLOATING BULK SELECTION ACTION BAR */}
       {selectedAssetIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-4 rounded-2xl shadow-2xl border border-slate-800 z-[999] flex flex-wrap items-center justify-between gap-4 w-[90%] max-w-2xl animate-in fade-in slide-in-from-bottom-5 duration-300">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-800 z-[999] flex flex-wrap items-center justify-between gap-4 w-[95%] max-w-4xl animate-in fade-in slide-in-from-bottom-5 duration-300">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white border border-primary/20">
-              <QrCode className="w-4 h-4 animate-pulse" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-secondary to-primary flex items-center justify-center text-white border border-primary/20">
+              <CheckSquare className="w-5 h-5 text-white animate-pulse" />
             </div>
             <div>
-              <p className="text-xs font-bold font-sans">
-                เลือกครุภัณฑ์แล้ว <span className="text-cyan-400 font-extrabold text-sm">{selectedAssetIds.length}</span> รายการ
+              <p className="text-xs font-bold font-sans flex items-center gap-1.5">
+                เลือกครุภัณฑ์แล้ว <span className="bg-primary/20 text-cyan-400 font-extrabold text-xs px-2 py-0.5 rounded-full border border-primary/30">{selectedAssetIds.length}</span> รายการ
               </p>
-              <p className="text-[10px] text-slate-400">
-                พร้อมสำหรับการพิมพ์สติกเกอร์รหัส QR Code (Sticker Labels)
+              <p className="text-[10px] text-slate-400 font-medium">
+                เลือกคำสั่งที่ต้องการดำเนินการแบบกลุ่มสำหรับครุภัณฑ์เหล่านี้
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap gap-2">
             <button
               onClick={() => setSelectedAssetIds([])}
-              className="px-3.5 py-2 hover:bg-white/10 rounded-xl text-slate-300 hover:text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-2 hover:bg-white/10 rounded-xl text-slate-300 hover:text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
             >
               <X className="w-3.5 h-3.5" />
               <span>ล้างทั้งหมด</span>
             </button>
+
             <button
               onClick={handleOpenPrintModal}
-              className="px-4 py-2 bg-gradient-to-r from-secondary to-primary hover:from-secondary-container hover:to-primary-container text-white rounded-xl font-bold text-xs shadow-lg shadow-secondary/25 hover:shadow-secondary/40 hover:-translate-y-0.5 transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>พิมพ์ QR Sticker ({selectedAssetIds.length})</span>
             </button>
+
+            <button
+              onClick={() => {
+                setBulkActionType('assign');
+                setIsBulkAssignOpen(true);
+              }}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-sky-400" />
+              <span>มอบหมายผู้ใช้ ({selectedAssetIds.length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setBulkActionType('return');
+                setIsBulkAssignOpen(true);
+              }}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5 text-amber-400" />
+              <span>คืนคลัง/ปรับสถานะ ({selectedAssetIds.length})</span>
+            </button>
+
+            <button
+              onClick={() => setIsBulkDeleteOpen(true)}
+              className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/30 text-rose-400 hover:text-rose-300 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5 animate-bounce" />
+              <span>ลบที่เลือก ({selectedAssetIds.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Bulk Delete Assets Confirmation */}
+      {isBulkDeleteOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1002] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in duration-150">
+            <div className="p-5 flex items-start gap-4">
+              <div className="w-11 h-11 rounded-xl bg-rose-50 flex items-center justify-center text-rose-500 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <h3 className="font-sans font-bold text-slate-800 text-sm">ต้องการลบครุภัณฑ์ที่เลือกแบบกลุ่มหรือไม่?</h3>
+                <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                  คุณกำลังจะลบครุภัณฑ์ที่เลือกทั้งหมด <span className="text-rose-600 font-extrabold">{selectedAssetIds.length} รายการ</span> ถาวรออกจากระบบคลาวด์ การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                </p>
+                
+                {/* List of assets to be deleted */}
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 max-h-36 overflow-y-auto space-y-1 mt-2 text-[11px] font-mono text-slate-600">
+                  {assets.filter(a => selectedAssetIds.includes(a.id)).map(asset => (
+                    <div key={asset.id} className="flex justify-between items-center py-0.5 border-b border-slate-100/50 last:border-0">
+                      <span className="font-semibold text-slate-700">{asset.id}</span>
+                      <span className="text-slate-400 truncate max-w-[200px]">{asset.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteOpen(false)}
+                className="px-4 py-2 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteBulkDelete}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                ยืนยันการลบแบบกลุ่ม ({selectedAssetIds.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Bulk Assign & Status Change */}
+      {isBulkAssignOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1002] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in duration-150 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary animate-pulse">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-sans font-bold text-slate-800 text-sm">การดำเนินการแบบกลุ่ม ({selectedAssetIds.length} รายการ)</h3>
+                  <p className="text-[10px] text-slate-400 font-medium">จัดการมอบหมายสิทธิ์ คืนคลัง หรือปรับเปลี่ยนสถานะสำหรับครุภัณฑ์ที่เลือกทั้งหมด</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsBulkAssignOpen(false)}
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              {/* Select Action Mode */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  เลือกประเภทการดำเนินการ
+                </label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setBulkActionType('assign')}
+                    className={`p-3 rounded-xl border font-bold text-xs flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                      bulkActionType === 'assign'
+                        ? 'border-primary bg-primary/5 text-primary shadow-sm'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    <UserPlus className="w-5 h-5" />
+                    <span>มอบหมายผู้ใช้งาน</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkActionType('return')}
+                    className={`p-3 rounded-xl border font-bold text-xs flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                      bulkActionType === 'return'
+                        ? 'border-amber-500 bg-amber-500/5 text-amber-600 shadow-sm'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    <ArrowLeftRight className="w-5 h-5" />
+                    <span>คืนครุภัณฑ์สู่คลังกลาง</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkActionType('repair')}
+                    className={`p-3 rounded-xl border font-bold text-xs flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                      bulkActionType === 'repair'
+                        ? 'border-rose-500 bg-rose-500/5 text-rose-600 shadow-sm'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    <AlertTriangle className="w-5 h-5" />
+                    <span>ส่งครุภัณฑ์เข้าปรับปรุง/ซ่อม</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Action specific subform */}
+              {bulkActionType === 'assign' && (
+                <div className="space-y-3 p-4 bg-slate-50/50 border border-slate-100 rounded-xl animate-in fade-in duration-200">
+                  <div className="border-b border-slate-100 pb-2 mb-2">
+                    <p className="text-xs font-bold text-slate-700">ข้อมูลผู้ใช้งานที่ต้องการมอบหมาย</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">เลือกจากรายชื่อบุคลากรในระบบหรือระบุข้อมูลแบบกำหนดเอง (Custom)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                      ดึงรายชื่อบุคลากร (System Users)
+                    </label>
+                    <select
+                      value={selectedBulkUser}
+                      onChange={(e) => handleBulkUserSelectChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                    >
+                      <option value="">-- ไม่เลือกดึงรายชื่อระบบ (ระบุเอง) --</option>
+                      {systemUsers.map((user) => (
+                        <option key={user.id} value={user.email}>
+                          👤 {user.name} ({user.department}) - {user.email}
+                        </option>
+                      ))}
+                      <option value="custom">✍️ ระบุข้อมูลด้วยตนเอง (Custom)</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                        ชื่อ-นามสกุล ผู้รับผิดชอบ *
+                      </label>
+                      <input
+                        type="text"
+                        value={bulkAssigneeName}
+                        onChange={(e) => setBulkAssigneeName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="เช่น คุณสมบัติ เรียนดี"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                        อีเมลผู้รับผิดชอบ
+                      </label>
+                      <input
+                        type="email"
+                        value={bulkAssigneeEmail}
+                        onChange={(e) => setBulkAssigneeEmail(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="suchart@example.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                        แผนก / ฝ่ายสังกัด
+                      </label>
+                      <input
+                        type="text"
+                        value={bulkAssigneeDept}
+                        onChange={(e) => setBulkAssigneeDept(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="เช่น เทคโนโลยีสารสนเทศ (IT)"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                        ตำแหน่ง (Role)
+                      </label>
+                      <input
+                        type="text"
+                        value={bulkAssigneeRole}
+                        onChange={(e) => setBulkAssigneeRole(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="เช่น System Engineer"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                        สถานที่ทำงาน / ตึกสำนักงาน
+                      </label>
+                      <input
+                        type="text"
+                        value={bulkAssigneeLocation}
+                        onChange={(e) => setBulkAssigneeLocation(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="เช่น ตึก A ชั้น 5"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                        เบอร์ติดต่อภายใน
+                      </label>
+                      <input
+                        type="text"
+                        value={bulkAssigneePhone}
+                        onChange={(e) => setBulkAssigneePhone(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="เช่น 02-xxx-xxxx"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {bulkActionType === 'return' && (
+                <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl space-y-1.5 animate-in fade-in duration-200">
+                  <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                    <ArrowLeftRight className="w-4 h-4" />
+                    คืนครุภัณฑ์ที่เลือกทั้งหมดกลับสู่คลังกลาง (Central Stock)
+                  </p>
+                  <p className="text-[11px] text-amber-700/80 font-medium leading-relaxed">
+                    ระบบจะเปลี่ยนสถานะครุภัณฑ์เป็น <span className="font-bold">"Available" (พร้อมใช้งาน)</span> และทำการเคลียร์ข้อมูลผู้ถือครอง/ผู้รับผิดชอบเดิมทั้งหมด เพื่อรอการกระจายสิทธิ์ให้กับผู้ใช้อื่นต่อไป
+                  </p>
+                </div>
+              )}
+
+              {bulkActionType === 'repair' && (
+                <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl space-y-1.5 animate-in fade-in duration-200">
+                  <p className="text-xs font-bold text-rose-800 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4" />
+                    ส่งครุภัณฑ์ที่เลือกเข้าระบบปรับปรุงแก้ไข / ส่งซ่อมชั่วคราว
+                  </p>
+                  <p className="text-[11px] text-rose-700/80 font-medium leading-relaxed">
+                    ระบบจะเปลี่ยนสถานะครุภัณฑ์เป็น <span className="font-bold">"Repair" (ส่งซ่อม)</span> เพื่อทำประวัติติดตามและระงับการเบิกใช้งานชั่วคราว ข้อมูลผู้รับผิดชอบเดิมจะยังคงอยู่เพื่อการประเมิน
+                  </p>
+                </div>
+              )}
+
+              {/* Selection Summary */}
+              <div className="border-t border-slate-100 pt-3.5 space-y-2">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">ครุภัณฑ์ที่เกี่ยวข้อง ({selectedAssetIds.length} รายการ)</p>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded-lg border border-slate-100/80">
+                  {assets.filter(a => selectedAssetIds.includes(a.id)).map(a => (
+                    <span key={a.id} className="text-[10px] font-mono font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded border border-slate-300/30">
+                      📦 {a.id}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsBulkAssignOpen(false)}
+                className="px-4 py-2 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={bulkActionType === 'assign' && !bulkAssigneeName.trim()}
+                onClick={handleExecuteBulkAssign}
+                className="px-5 py-2 bg-primary hover:bg-primary-container text-white disabled:bg-slate-300 disabled:text-slate-500 font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>ยืนยันและดำเนินการแบบกลุ่ม</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

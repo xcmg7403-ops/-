@@ -276,7 +276,7 @@ export default function QRScannerModal({
                     // Filter out generic labels if they match our presets, or just show them all
                     if (device.label.toLowerCase().includes('front') || device.label.toLowerCase().includes('user')) return null;
                     return (
-                      <option key={device.deviceId} value={device.deviceId}>
+                      <option key={`${device.deviceId}-${index}`} value={device.deviceId}>
                         🔌 {device.label || `กล้องเสริมตัวที่ ${index + 1}`}
                       </option>
                     );

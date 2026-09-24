@@ -171,7 +171,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
     
     // Log this action
     const newLog: SystemLog = {
-      id: `LOG-${Date.now().toString().slice(-3)}`,
+      id: `LOG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleString('th-TH'),
       user: 'คุณสิรินทร์ เทคโน (Admin)',
       action: `สร้างบัญชีผู้ใช้งานใหม่: ${newUserName} (${newUserRole})`,
@@ -196,7 +196,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
 
     // Log this action
     const newLog: SystemLog = {
-      id: `LOG-${Date.now().toString().slice(-3)}`,
+      id: `LOG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleString('th-TH'),
       user: 'คุณสิรินทร์ เทคโน (Admin)',
       action: `แก้ไขข้อมูลและสิทธิ์ผู้ใช้: ${editingUser.name} (สิทธิ์: ${editingUser.role}, สถานะ: ${editingUser.status})`,
@@ -218,7 +218,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
 
     // Log this action
     const newLog: SystemLog = {
-      id: `LOG-${Date.now().toString().slice(-3)}`,
+      id: `LOG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleString('th-TH'),
       user: 'คุณสิรินทร์ เทคโน (Admin)',
       action: `ลบผู้ใช้งานระบบ: ${targetUser.name} (${targetUser.email})`,
@@ -256,7 +256,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
       triggerToast('success', 'ปรับปรุงประสิทธิภาพฐานข้อมูลเสร็จสิ้น ขนาดลดลง 14.2%');
       
       const newLog: SystemLog = {
-        id: `LOG-${Date.now().toString().slice(-3)}`,
+        id: `LOG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
         timestamp: new Date().toLocaleString('th-TH'),
         user: 'คุณสิรินทร์ เทคโน (Admin)',
         action: 'สั่งรันคำสั่งบีบอัดความจุฐานข้อมูลระบบ (Database Shrink & Optimize)',
@@ -306,7 +306,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
 
     // 4. Log this action
     const newLog: SystemLog = {
-      id: `LOG-${Date.now().toString().slice(-3)}`,
+      id: `LOG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleString('th-TH'),
       user: 'คุณสิรินทร์ เทคโน (Admin)',
       action: `อนุมัติคำขอเข้าใช้งานและกำหนดสิทธิ์ให้: ${approvingRequest.name} (${approvingRequest.email}) เป็น ${approvingRequest.requestedRole === 'admin' ? 'Administrator' : 'IT Operations'}`,
@@ -327,7 +327,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
 
     // Log this action
     const newLog: SystemLog = {
-      id: `LOG-${Date.now().toString().slice(-3)}`,
+      id: `LOG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleString('th-TH'),
       user: 'คุณสิรินทร์ เทคโน (Admin)',
       action: `ปฏิเสธคำขอเข้าใช้งานระบบของ: ${targetReq.name} (${targetReq.email})`,
@@ -346,7 +346,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
     setAccessRequests(prev => prev.map(req => req.id === editingRequest.id ? editingRequest : req));
     
     const newLog: SystemLog = {
-      id: `LOG-${Date.now().toString().slice(-3)}`,
+      id: `LOG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleString('th-TH'),
       user: 'คุณสิรินทร์ เทคโน (Admin)',
       action: `แก้ไขข้อมูลคำขอเข้าใช้งานระบบ: ${editingRequest.name} (สังกัด: ${editingRequest.department})`,
@@ -366,7 +366,7 @@ export default function AdminPortalView({ assets, triggerToast }: AdminPortalVie
     setAccessRequests(prev => prev.filter(req => req.id !== reqId));
     
     const newLog: SystemLog = {
-      id: `LOG-${Date.now().toString().slice(-3)}`,
+      id: `LOG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleString('th-TH'),
       user: 'คุณสิรินทร์ เทคโน (Admin)',
       action: `ลบข้อมูลคำขอเข้าใช้งานระบบ: ${target.name} (${target.email})`,

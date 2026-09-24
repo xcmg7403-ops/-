@@ -614,11 +614,13 @@ export default function MaintenanceView({
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-secondary/20 bg-white"
                   >
                     <option value="">-- กรุณาเลือกครุภัณฑ์ --</option>
-                    {assets.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.id} - {a.name}
-                      </option>
-                    ))}
+                    {[...assets]
+                      .sort((a, b) => (a.id || '').localeCompare(b.id || '', undefined, { numeric: true, sensitivity: 'base' }))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.id} - {a.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
 

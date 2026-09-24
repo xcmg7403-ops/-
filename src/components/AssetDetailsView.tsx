@@ -1364,7 +1364,7 @@ export default function AssetDetailsView({
                   </div>
                 )}
                 {asset.detailedSpecs && asset.detailedSpecs.map((spec, index) => (
-                  <div key={index} className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                  <div key={`${spec.item}-${index}`} className="flex justify-between items-center py-1.5 border-b border-slate-100">
                     <span className="text-slate-500 font-medium">{spec.item}:</span>
                     <span className="font-bold text-slate-800 text-sm">{spec.details}</span>
                   </div>
@@ -1621,7 +1621,7 @@ export default function AssetDetailsView({
             {asset.repairsHistory && asset.repairsHistory.length > 0 ? (
               asset.repairsHistory.map((log, i) => {
                 return (
-                  <div key={i} className="flex gap-3">
+                  <div key={`${log.date}-${log.action}-${i}`} className="flex gap-3">
                     <div className="flex flex-col items-center">
                       <div className="w-2 h-2 rounded-full bg-secondary shrink-0 mt-1"></div>
                       {i < asset.repairsHistory!.length - 1 && (

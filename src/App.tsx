@@ -31,20 +31,31 @@ import {
 } from './lib/firebase';
 
 export default function App() {
+  // Helper to filter out duplicate elements by ID
+  const deduplicateById = <T extends { id: string }>(arr: T[]): T[] => {
+    const seen = new Set<string>();
+    return arr.filter(item => {
+      if (!item || !item.id) return false;
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  };
+
   // Master persistent state loaders
   const [assets, setAssets] = useState<Asset[]>(() => {
     const saved = localStorage.getItem('assetmanager_assets');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? deduplicateById(JSON.parse(saved)) : [];
   });
 
   const [repairTickets, setRepairTickets] = useState<RepairTicket[]>(() => {
     const saved = localStorage.getItem('assetmanager_tickets');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? deduplicateById(JSON.parse(saved)) : [];
   });
 
   const [maintenanceEvents, setMaintenanceEvents] = useState<MaintenanceEvent[]>(() => {
     const saved = localStorage.getItem('assetmanager_events');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? deduplicateById(JSON.parse(saved)) : [];
   });
 
   // User auth session
